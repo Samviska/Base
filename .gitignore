@@ -1,0 +1,35 @@
+# 忽略规则
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ---- 前端 / Node ----
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# ---- 打包产物 ----
+build/
+release/
+*.spec.bak
+
+# ---- 运行时产出 ----
+logs/
+*.log
+_local/
+cache/
+
+# ---- 编辑器 / 系统 ----
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
+.DS_Store
