@@ -136,6 +136,8 @@ def staged_status() -> list[tuple[str, str]]:
     out = subprocess.run(
         ["git", "diff", "--cached", "--name-status"],
         cwd=ROOT, capture_output=True, text=True, check=True,
+        # Windows 上默认按 locale(GBK) 解码，含中文路径时会直接抛异常
+        encoding="utf-8", errors="replace",
     )
     rows: list[tuple[str, str]] = []
     for line in out.stdout.splitlines():
@@ -202,12 +204,16 @@ def check_version_bumped(rows: list[tuple[str, str]]) -> list[str]:
 
 def main() -> int:
     staged_only = "--staged" in sys.argv
+    # commit.py 在递增 VERSION **之前**调用本脚本做预检，此时版本号必然还没变，
+    # 故由它传 --skip-version 跳过该项。真正的强制检查发生在 git commit 触发的钩子里。
+    skip_version = "--skip-version" in sys.argv
     problems = check_links() + check_json() + check_contract_examples() + check_module_registry()
     if staged_only:
         rows = staged_status()
         problems += check_docs_updated(staged_files())
         problems += check_module_doc_sync(rows)
-        problems += check_version_bumped(rows)
+        if not skip_version:
+            problems += check_version_bumped(rows)
 
     if problems:
         print("\n检查未通过：")

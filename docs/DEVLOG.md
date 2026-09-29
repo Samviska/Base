@@ -49,6 +49,43 @@
 
 ## 记录
 
+### 2026-09-29 | 工具链 | 修复提交脚本的自锁：预检与版本递增的顺序
+
+**改动**：`check_docs.py` 新增 `--skip-version` 参数；`commit.py` 预检时传入它。
+
+**原因**：第二次用 `commit.py` 提交时报 "VERSION 未在本提交中更新" 并中止——脚本把自己锁死了。
+
+**根因**：`commit.py` 的顺序是"先预检 → 再递增版本"，而预检里包含"VERSION 必须已更新"这一条，
+于是永远无法通过。第一次提交之所以没暴露，是因为那时 `VERSION` 是**新增文件**，
+检查看到它就在暂存区里便放行了——**只验证了首次路径，漏掉了重复提交的路径**。
+修法：预检跳过该项（此刻本就该还没改），真正的强制交给 `git commit` 触发的钩子——
+那时版本号已经递增完毕。
+
+**影响面**：无契约变更。
+
+**验证**：连续用 `commit.py` 提交两次均成功；直接 `git commit` 仍被拒绝。
+
+**相关**：`scripts/commit.py`、`scripts/check_docs.py`
+
+### 2026-09-29 | 工具链 | 修复 subprocess 在 Windows 上的编码崩溃
+
+**改动**：`scripts/commit.py` 与 `scripts/check_docs.py` 中所有
+`subprocess.run(..., text=True)` 调用补上 `encoding="utf-8", errors="replace"`。
+
+**原因**：第一次用 `commit.py` 提交时，stderr 出现 `UnicodeDecodeError: 'gbk' codec ...`，
+但**提交仍然成功**，很容易被当成噪音忽略。
+
+**根因**：Windows 上 `subprocess` 在 `text=True` 时按系统 locale（简中为 GBK）解码子进程输出，
+而 git 与钩子输出的是 UTF-8，中文字节被按 GBK 解就失败。
+**危险之处**：它发生在读取线程里，不影响主进程退出码——只看"提交成功"永远发现不了。
+含中文路径的 `git diff --name-status` 会触发同样的问题。
+
+**影响面**：无契约变更，仅修工具链编码问题。
+
+**验证**：重新用 `commit.py` 提交，stderr 无异常；`git log` 中文提交信息正常显示。
+
+**相关**：`scripts/commit.py`、`scripts/check_docs.py`
+
 ### 2026-09-29 | 工具链 | 引入版本号系统与规格化提交
 
 **改动**：

@@ -33,7 +33,11 @@ CODE_ROOTS = ("backend", "frontend", "plugins")
 
 
 def git(*args: str) -> subprocess.CompletedProcess:
-    return subprocess.run(["git", *args], cwd=ROOT, text=True, capture_output=True)
+    # Windows 上 subprocess 默认按 locale(GBK) 解码，而 git 与钩子输出 UTF-8，必须显式指定
+    return subprocess.run(
+        ["git", *args], cwd=ROOT, capture_output=True, text=True,
+        encoding="utf-8", errors="replace",
+    )
 
 
 def read_version() -> tuple[int, int, int]:
@@ -85,9 +89,9 @@ def main() -> int:
     if not rows:
         sys.exit("暂存区为空。先 git add，再运行本脚本。")
 
-    # 复用同一个检查脚本，避免出现两套规则
+    # 预检跳过版本号检查：递增发生在其后。真正的强制由 git commit 触发的钩子完成
     check = subprocess.run(
-        [sys.executable, "scripts/check_docs.py", "--staged"], cwd=ROOT
+        [sys.executable, "scripts/check_docs.py", "--staged", "--skip-version"], cwd=ROOT
     )
     if check.returncode != 0:
         sys.exit("检查未通过，已中止提交（未改动 VERSION）")
