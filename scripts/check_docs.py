@@ -2,10 +2,11 @@
 # -*- coding: utf-8 -*-
 """文档与契约的一致性检查。
 
-全量模式：链接有效性、JSON 语法、契约示例与 schema 的一致性、模块文档是否已登记。
+全量模式：链接有效性、JSON 语法、契约示例与 schema 的一致性、模块文档是否已登记、
+文档里的编号引用是否落在登记范围内。
 --staged 模式：额外要求"代码有改动就必须更新 docs/DEVLOG.md"（pre-commit 使用）。
 
-契约示例的校验依赖 jsonschema；未安装时跳过并提示，不算失败。
+契约示例的校验依赖 jsonschema；**未安装时判失败**——静默跳过的校验等于没有校验。
 跳过文档更新检查：设置 SKIP_DOC_CHECK=1，并在提交信息里说明理由。
 """
 from __future__ import annotations
@@ -29,8 +30,12 @@ ROOT = Path(__file__).resolve().parent.parent
 # markdown 内的相对链接，只关心指向本仓库文件的
 LINK_RE = re.compile(r"\]\(([^)\s]+\.(?:md|json))(?:#[^)]*)?\)")
 
-# 这些路径下出现实质改动时，要求同一提交里更新 DEVLOG
-CODE_PREFIXES = ("backend/", "frontend/", "plugins/", "contract/schema/", "contract/examples/")
+# 这些路径下出现实质改动时，要求同一提交里更新 DEVLOG。
+# 含 scripts/：改检查脚本本身属于"改规则"，同样影响后续所有人的做法。
+CODE_PREFIXES = (
+    "backend/", "frontend/", "plugins/", "scripts/",
+    "contract/schema/", "contract/examples/",
+)
 
 # 模块目录 → 该模块的开发文档。目录下**新增或删除**文件时，要求文档同步更新。
 # 只修改既有文件时不强制（避免改一行代码就要动文档），只在 stderr 提示。
@@ -48,6 +53,15 @@ MODULE_DOC_MAP = {
 }
 # 占位与纯说明文件不算实质改动（AGENTS.md 是就地规则，不代表模块能力变化）
 IGNORED_SUFFIXES = (".gitkeep", "README.md", "AGENTS.md")
+
+# 编号登记表：文档里引用 `S5`/`D3` 这类编号，其含义与有效范围由该文件的 §1 声明。
+# 没有登记处，编号换会话后就无从解析——引用的内容等于不存在。
+ID_REGISTRY = ROOT / "docs" / "acceptance.md"
+# 登记表行：| `S` | 成功标准 | 本文件 §3 | S1–S7 |
+# 范围分隔符放宽到常见几种横线，避免全角/半角差异导致整张表解析失败
+ID_ROW_RE = re.compile(
+    r"^\|\s*`([A-Z]{1,3})`\s*\|[^|]*\|[^|]*\|\s*([A-Z]{1,3})(\d{1,3})\s*[–—~\-]\s*[A-Z]{1,3}(\d{1,3})\s*\|"
+)
 
 
 def rel(path: Path) -> str:
@@ -127,6 +141,67 @@ def check_module_registry() -> list[str]:
             continue
         if f.name not in text:
             problems.append(f"docs/modules/{f.name}: 未在 docs/MODULES.md 中登记")
+    return problems
+
+
+def load_id_registry() -> dict[str, tuple[int, int]]:
+    """解析编号登记表，返回 {前缀: (下界, 上界)}。"""
+    registry: dict[str, tuple[int, int]] = {}
+    if not ID_REGISTRY.exists():
+        return registry
+    for line in ID_REGISTRY.read_text(encoding="utf-8").splitlines():
+        m = ID_ROW_RE.match(line.strip())
+        if not m:
+            continue
+        prefix, inner, lo, hi = m.group(1), m.group(2), int(m.group(3)), int(m.group(4))
+        # 范围列写的前缀必须与登记的前缀一致，写错了这条路等于没校验
+        if inner != prefix or lo > hi:
+            continue
+        registry[prefix] = (lo, hi)
+    return registry
+
+
+def check_id_references() -> list[str]:
+    """文档里引用的编号必须落在登记表声明的范围内。
+
+    只校验**已登记**的前缀：未登记的前缀无法与 UTF8 / SHA256 这类普通词区分，
+    强判会大量误报。新增前缀属于"新增体系"，由 AGENTS.md 要求人工登记。
+    围栏代码块内的内容不检查——那里是示例与验证证据，不是引用。
+    """
+    if not ID_REGISTRY.exists():
+        return [f"缺少编号登记表 {rel(ID_REGISTRY)}"]
+    registry = load_id_registry()
+    if not registry:
+        return [f"{rel(ID_REGISTRY)} 的编号登记表为空或格式不符，编号引用无法校验"]
+
+    problems: list[str] = []
+    seen: set[tuple[str, str]] = set()
+    ordered = sorted(registry.items(), key=lambda kv: -len(kv[0]))  # 长前缀优先
+    for md in iter_files("*.md"):
+        try:
+            text = md.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue  # 编码问题由 check_links 报告，这里不重复报
+        in_fence = False
+        for line in text.splitlines():
+            if line.lstrip().startswith(("```", "~~~")):
+                in_fence = not in_fence
+                continue
+            if in_fence:
+                continue
+            for prefix, (lo, hi) in ordered:
+                for m in re.finditer(rf"\b{prefix}(\d{{1,3}})\b", line):
+                    n = int(m.group(1))
+                    if lo <= n <= hi:
+                        continue
+                    key = (rel(md), f"{prefix}{n}")
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    problems.append(
+                        f"{rel(md)}: 引用了未定义的编号 {prefix}{n}"
+                        f"（登记范围 {prefix}{lo}–{prefix}{hi}）"
+                    )
     return problems
 
 
@@ -237,7 +312,13 @@ def main() -> int:
     skip_version = "--skip-version" in sys.argv
     commit_rev = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--commit=")), None)
 
-    problems = check_links() + check_json() + check_contract_examples() + check_module_registry()
+    problems = (
+        check_links()
+        + check_json()
+        + check_contract_examples()
+        + check_module_registry()
+        + check_id_references()
+    )
 
     # 过程约束需要一份"改动清单"：本地来自暂存区，CI 来自提交
     rows: list[tuple[str, str]] | None = None
