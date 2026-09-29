@@ -155,6 +155,27 @@ def staged_status() -> list[tuple[str, str]]:
     return rows
 
 
+def commit_rows(rev: str) -> list[tuple[str, str]] | None:
+    """读取某个提交的改动清单，供 CI 复用同一套过程约束检查。
+
+    CI 里没有"暂存区"，只有提交，所以需要这个入口。
+    已知缺口：合并提交不展开差异，会返回空清单，过程约束检查随之跳过。
+    """
+    out = subprocess.run(
+        ["git", "show", "--name-status", "--format=", rev],
+        cwd=ROOT, capture_output=True, text=True,
+        encoding="utf-8", errors="replace",
+    )
+    if out.returncode != 0:
+        return None
+    rows: list[tuple[str, str]] = []
+    for line in out.stdout.splitlines():
+        parts = line.split("\t")
+        if len(parts) >= 2:
+            rows.append((parts[0][:1], parts[-1].strip().replace("\\", "/")))
+    return rows
+
+
 def check_module_doc_sync(rows: list[tuple[str, str]]) -> list[str]:
     """模块目录下新增或删除文件，说明该模块的能力变了，模块文档必须同步。"""
     if os.environ.get("SKIP_DOC_CHECK") == "1":
@@ -214,9 +235,20 @@ def main() -> int:
     # commit.py 在递增 VERSION **之前**调用本脚本做预检，此时版本号必然还没变，
     # 故由它传 --skip-version 跳过该项。真正的强制检查发生在 git commit 触发的钩子里。
     skip_version = "--skip-version" in sys.argv
+    commit_rev = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--commit=")), None)
+
     problems = check_links() + check_json() + check_contract_examples() + check_module_registry()
+
+    # 过程约束需要一份"改动清单"：本地来自暂存区，CI 来自提交
+    rows: list[tuple[str, str]] | None = None
     if staged_only:
         rows = staged_status()
+    elif commit_rev:
+        rows = commit_rows(commit_rev)
+        if rows is None:
+            problems.append(f"无法读取提交 {commit_rev} 的改动清单")
+
+    if rows is not None:
         problems += check_docs_updated(rows)
         problems += check_module_doc_sync(rows)
         if not skip_version:

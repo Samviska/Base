@@ -89,8 +89,10 @@ pip install jsonschema
 
 | 限制 | 说明 | 缓解 |
 | --- | --- | --- |
-| `git commit --no-verify` 可绕过全部检查 | git 的设计，本地钩子无法阻止 | 配好远端后加 CI 或服务端钩子复查 |
+| `git commit --no-verify` 可绕过本地钩子 | git 的设计，本地无法阻止 | **已由 GitHub Actions 覆盖**：`.github/workflows/check.yml` 跑同一套脚本 |
 | **clone 后钩子默认不生效** | `core.hooksPath` 是本地配置，不随仓库分发 | **clone 后必须跑 `python scripts/setup.py`** |
+| CI 只检查**最后一个提交**的过程约束 | 一次推送多个提交时，中间提交可能漏检 | 一次推送尽量少提交；后续可扩展为 range 检查 |
+| 合并提交不展开差异 | `--commit` 模式下过程约束会跳过 | 避免用合并提交推送 |
 | 检查只管形式，不管内容 | 能拦住"没写文档"，拦不住"文档写得含糊" | 定期做 S3 验收：让全新会话只读文档做一件小事 |
 
 ### 3.4 首次搭建
@@ -125,7 +127,9 @@ Base/
 ├── README.md              项目入口
 ├── AGENTS.md              **AI 会话自动加载的规则入口**（每次动手前必读）
 ├── VERSION                **应用版本号**（唯一版本源，脚本自动维护）
+├── LICENSE                MIT
 ├── .githooks/             git 钩子（提交前强制检查文档与版本号）
+├── .github/workflows/     CI（推送后跑同一套检查，堵住 --no-verify 绕过）
 ├── docs/                  全部文档（入口是 docs/README.md）
 │   ├── overview.md        本文件
 │   ├── README.md          文档地图

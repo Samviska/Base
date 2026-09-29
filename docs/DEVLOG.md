@@ -49,6 +49,30 @@
 
 ## 记录
 
+### 2026-09-29 | 工具链 | 接入远端仓库与 CI
+
+**改动**：
+
+- 配置远端 `origin` = `git@github.com:Samviska/Base.git`
+- 取回远端 `main` 上已有的 `LICENSE`（MIT, © 2026 Samviska），纳入本项目历史
+- 新增 `.github/workflows/check.yml`：推送后跑同一套 `check_docs.py`，并检查本次提交的过程约束
+- `check_docs.py` 新增 `--commit=<rev>`：CI 里没有暂存区，改为从提交读改动清单
+- `README.md` 补"许可证"一节；`docs/overview.md` 更新目录树与已知限制
+
+**原因**：本地钩子可被 `git commit --no-verify` 绕过，这是 git 的设计，本地无解。
+配好远端后即可用 CI 补上——**这是唯一能覆盖该绕过路径的手段**。
+
+**影响面**：无契约变更。
+仓库原有的 `main`（仅含 GitHub 自动生成的 `LICENSE`）与本地 `master`（13 个提交）
+是两段**互不相关**的历史，本次统一为 `main`。
+
+**验证**：
+
+- `python scripts/check_docs.py --commit=HEAD` 可在本地复现 CI 的过程约束检查
+- 推送后 GitHub Actions 的实际运行结果（仓库 Actions 页）
+
+**相关**：`.github/workflows/check.yml`、[overview.md](overview.md) §3.3
+
 ### 2026-09-29 | 工具链 | 补第 8 个漏洞：钩子文件本身可被删除
 
 **改动**：`commit.py` 的启动自检从"只查 `core.hooksPath` 配置"扩展为"配置正确**且**钩子文件存在且非空"。

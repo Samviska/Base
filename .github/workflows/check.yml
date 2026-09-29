@@ -1,0 +1,35 @@
+name: 检查
+
+# 为什么需要 CI：本地 pre-commit 钩子可以被 `git commit --no-verify` 绕过，
+# 这是 git 的设计，本地无法阻止。CI 在推送后跑同一套检查脚本，把这个洞补上。
+#
+# 分工：
+#   本地钩子 —— 提交时拦，管过程约束（DEVLOG、版本号、模块文档同步）
+#   CI      —— 推送后拦，管客观正确性 + 最后一次提交的过程约束
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # 需要父提交才能读取本次提交的改动清单，浅克隆会失败
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安装依赖
+        run: pip install jsonschema
+
+      - name: 文档与契约全量检查
+        run: python scripts/check_docs.py
+
+      - name: 本次提交的过程约束（DEVLOG / 版本号 / 模块文档）
+        run: python scripts/check_docs.py --commit=HEAD
