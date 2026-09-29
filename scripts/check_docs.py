@@ -30,7 +30,7 @@ ROOT = Path(__file__).resolve().parent.parent
 LINK_RE = re.compile(r"\]\(([^)\s]+\.(?:md|json))(?:#[^)]*)?\)")
 
 # 这些路径下出现实质改动时，要求同一提交里更新 DEVLOG
-CODE_PREFIXES = ("backend/", "frontend/", "contract/schema/", "contract/examples/")
+CODE_PREFIXES = ("backend/", "frontend/", "plugins/", "contract/schema/", "contract/examples/")
 
 # 模块目录 → 该模块的开发文档。目录下**新增或删除**文件时，要求文档同步更新。
 # 只修改既有文件时不强制（避免改一行代码就要动文档），只在 stderr 提示。
@@ -96,8 +96,11 @@ def check_contract_examples() -> list[str]:
     try:
         from jsonschema import Draft202012Validator
     except ImportError:
-        print("[跳过] 未安装 jsonschema，契约示例未做结构校验（pip install jsonschema）")
-        return []
+        # 契约校验是核心保障。静默跳过等于没有校验，所以这里必须判失败
+        return [
+            "未安装 jsonschema，契约示例无法校验。",
+            "  安装：pip install jsonschema",
+        ]
 
     validator = Draft202012Validator(json.loads(schema_path.read_text(encoding="utf-8")))
     problems: list[str] = []
@@ -127,8 +130,13 @@ def check_module_registry() -> list[str]:
     return problems
 
 
-def staged_files() -> list[str]:
-    return [p for _, p in staged_status()]
+def was_updated(rows: list[tuple[str, str]], path: str) -> bool:
+    """判断某个文件是否被**实质更新**。
+
+    只认新增 / 修改 / 重命名。删除也会让路径出现在暂存区里——
+    若不排除，删掉文档就等于"更新了文档"，这是最容易漏掉的绕过方式。
+    """
+    return any(p == path and st in ("A", "M", "R") for st, p in rows)
 
 
 def staged_status() -> list[tuple[str, str]]:
@@ -151,14 +159,13 @@ def check_module_doc_sync(rows: list[tuple[str, str]]) -> list[str]:
     """模块目录下新增或删除文件，说明该模块的能力变了，模块文档必须同步。"""
     if os.environ.get("SKIP_DOC_CHECK") == "1":
         return []
-    staged = {p for _, p in rows}
     problems: list[str] = []
     for prefix, doc in MODULE_DOC_MAP.items():
         structural = [
             p for st, p in rows
             if p.startswith(prefix) and st in ("A", "D") and not p.endswith(IGNORED_SUFFIXES)
         ]
-        if structural and doc not in staged:
+        if structural and not was_updated(rows, doc):
             sample = ", ".join(structural[:3]) + (" ..." if len(structural) > 3 else "")
             problems.append(
                 f"{prefix} 下新增或删除了文件（{sample}），"
@@ -167,15 +174,15 @@ def check_module_doc_sync(rows: list[tuple[str, str]]) -> list[str]:
     return problems
 
 
-def check_docs_updated(staged: list[str]) -> list[str]:
+def check_docs_updated(rows: list[tuple[str, str]]) -> list[str]:
     if os.environ.get("SKIP_DOC_CHECK") == "1":
         print("[跳过] SKIP_DOC_CHECK=1，未检查文档更新")
         return []
     code_changed = [
-        f for f in staged
-        if f.startswith(CODE_PREFIXES) and not f.endswith(IGNORED_SUFFIXES)
+        p for st, p in rows
+        if p.startswith(CODE_PREFIXES) and st in ("A", "M", "R") and not p.endswith(IGNORED_SUFFIXES)
     ]
-    if not code_changed or "docs/DEVLOG.md" in staged:
+    if not code_changed or was_updated(rows, "docs/DEVLOG.md"):
         return []
     preview = ", ".join(code_changed[:5]) + (" ..." if len(code_changed) > 5 else "")
     return [
@@ -193,7 +200,7 @@ def check_version_bumped(rows: list[tuple[str, str]]) -> list[str]:
     substantial = [p for _, p in rows if not p.endswith(IGNORED_SUFFIXES)]
     if not substantial:
         return []  # 只动了占位或说明文件，不要求升版本
-    if any(p == "VERSION" for _, p in rows):
+    if was_updated(rows, "VERSION"):
         return []
     return [
         "VERSION 未在本提交中更新。本项目要求每次提交都伴随版本号递增。",
@@ -210,7 +217,7 @@ def main() -> int:
     problems = check_links() + check_json() + check_contract_examples() + check_module_registry()
     if staged_only:
         rows = staged_status()
-        problems += check_docs_updated(staged_files())
+        problems += check_docs_updated(rows)
         problems += check_module_doc_sync(rows)
         if not skip_version:
             problems += check_version_bumped(rows)

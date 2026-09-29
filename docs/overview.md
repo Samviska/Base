@@ -75,18 +75,30 @@ git --version
 | 模块登记 | `docs/modules/` 下的文档必须已在 `docs/MODULES.md` 登记 |
 | **文档更新** | 代码有改动时，`docs/DEVLOG.md` 必须同时更新 |
 | **模块文档同步** | 某模块目录下**新增或删除**文件时，该模块的 `docs/modules/*.md` 必须同时更新 |
+| **版本号** | 每次提交必须递增 `VERSION` |
 
-**契约示例的结构校验需要 `jsonschema`**：
+**依赖 `jsonschema`。缺失时会直接判失败**（不允许静默跳过——静默跳过的校验等于没有校验）：
 
 ```powershell
 pip install jsonschema
 ```
 
-未安装时该项会跳过并提示，不阻止提交。
+临时跳过：`SKIP_DOC_CHECK=1 git commit ...`，并在提交信息里说明理由。
 
-临时跳过文档更新检查：`SKIP_DOC_CHECK=1 git commit ...`，并在提交信息里说明理由。
+#### 已知限制（必须知道）
+
+| 限制 | 说明 | 缓解 |
+| --- | --- | --- |
+| `git commit --no-verify` 可绕过全部检查 | git 的设计，本地钩子无法阻止 | 配好远端后加 CI 或服务端钩子复查 |
+| **clone 后钩子默认不生效** | `core.hooksPath` 是本地配置，不随仓库分发 | **clone 后必须跑 `python scripts/setup.py`** |
+| 检查只管形式，不管内容 | 能拦住"没写文档"，拦不住"文档写得含糊" | 定期做 S3 验收：让全新会话只读文档做一件小事 |
 
 ### 3.4 首次搭建
+
+```powershell
+python scripts/setup.py      # 启用 git 钩子（不执行则所有检查静默失效）
+pip install jsonschema       # 契约校验依赖
+```
 
 > **待补**：后端依赖管理方式尚未确定（见 §7），确定后补充本节。
 

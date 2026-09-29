@@ -42,11 +42,23 @@
 
 ---
 
+## 首次使用（clone 后必做）
+
+```powershell
+python scripts/setup.py      # 启用 git 钩子
+pip install jsonschema       # 契约校验依赖
+```
+
+> `core.hooksPath` 是**本地配置**，不随仓库分发。漏掉第一步不会有任何报错，
+> 但**所有提交前检查都会静默失效**。
+
+---
+
 ## 从这里开始
 
-1. **`docs/README.md`** —— 文档地图。里面有"我要做某件事，该读哪里"的导航表。
-2. **`docs/MODULES.md`** —— 模块地图。想知道某块代码在哪、能不能随便改，看这张表。
-3. **`docs/ARCHITECTURE.md`** —— 全局架构、分层规则、依赖方向。
+1. **`AGENTS.md`** —— 规则入口（AI 会话会自动加载它）
+2. **`docs/overview.md`** —— 技术栈、开发环境、目录架构
+3. **`docs/README.md`** —— 文档地图："我要做某件事，该读哪里"
 
 ---
 

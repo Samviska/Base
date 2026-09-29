@@ -89,6 +89,14 @@ def main() -> int:
     if not rows:
         sys.exit("暂存区为空。先 git add，再运行本脚本。")
 
+    # 钩子是本地配置，新克隆的仓库可能没启用；不检查的话所有校验都会静默失效
+    hooks = git("config", "core.hooksPath")
+    if hooks.stdout.strip() != ".githooks":
+        sys.exit(
+            "git 钩子未启用（core.hooksPath 不是 .githooks），提交前的强制检查不会执行。\n"
+            "  clone 仓库后必须运行一次：python scripts/setup.py"
+        )
+
     # 预检跳过版本号检查：递增发生在其后。真正的强制由 git commit 触发的钩子完成
     check = subprocess.run(
         [sys.executable, "scripts/check_docs.py", "--staged", "--skip-version"], cwd=ROOT
