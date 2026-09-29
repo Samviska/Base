@@ -22,7 +22,20 @@
 2. **在 `docs/DEVLOG.md` 最上面追加一条**（格式见该文件顶部）
    - 修 bug 必须写**根因**，不是"改了什么"
    - 必须诚实填写**影响面**
-3. 契约变更时：**升版本 + 改 schema + 改校验器 + 在 DEVLOG 写明是否需迁移**
+3. 契约变更时：**升契约版本 + 改 schema + 改校验器 + 在 DEVLOG 写明是否需迁移**
+
+---
+
+## 提交
+
+```powershell
+python scripts/commit.py -m "中文描述"           # 自动递增版本号并提交
+python scripts/commit.py -m "..." --bump=minor  # 新增能力 / 契约变化
+python scripts/commit.py -m "..." --tag --push  # 交付时：打标签并推送
+```
+
+**不要直接 `git commit`** —— 版本号不会递增，钩子会拒绝。
+规则见 [docs/versioning.md](docs/versioning.md)。
 
 ---
 

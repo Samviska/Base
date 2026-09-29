@@ -184,6 +184,22 @@ def check_docs_updated(staged: list[str]) -> list[str]:
     ]
 
 
+def check_version_bumped(rows: list[tuple[str, str]]) -> list[str]:
+    """本项目要求每次提交都伴随 VERSION 递增，避免版本号与代码脱节。"""
+    if os.environ.get("SKIP_DOC_CHECK") == "1":
+        return []
+    substantial = [p for _, p in rows if not p.endswith(IGNORED_SUFFIXES)]
+    if not substantial:
+        return []  # 只动了占位或说明文件，不要求升版本
+    if any(p == "VERSION" for _, p in rows):
+        return []
+    return [
+        "VERSION 未在本提交中更新。本项目要求每次提交都伴随版本号递增。",
+        '  推荐做法：python scripts/commit.py -m "你的描述"（自动递增并提交）',
+        "  确需跳过：SKIP_DOC_CHECK=1 git commit ... 并在提交信息里说明理由。",
+    ]
+
+
 def main() -> int:
     staged_only = "--staged" in sys.argv
     problems = check_links() + check_json() + check_contract_examples() + check_module_registry()
@@ -191,6 +207,7 @@ def main() -> int:
         rows = staged_status()
         problems += check_docs_updated(staged_files())
         problems += check_module_doc_sync(rows)
+        problems += check_version_bumped(rows)
 
     if problems:
         print("\n检查未通过：")

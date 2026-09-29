@@ -22,6 +22,7 @@
 | 查技术栈、版本、环境要求 | [overview.md](overview.md) | [DECISIONS.md](DECISIONS.md) |
 | 查前后端有哪些消息 | [messages.md](messages.md) | [protocol.md](protocol.md) |
 | 查"上次改了什么、为什么" | [DEVLOG.md](DEVLOG.md) | — |
+| **准备提交 / 搞不清版本号怎么定** | [versioning.md](versioning.md) | — |
 | 看还没做的功能 | [roadmap.md](roadmap.md) | — |
 | **第一次接触这个项目** | **[overview.md](overview.md)** | 本文件（文档地图） |
 
@@ -42,6 +43,7 @@
 | `protocol.md` | 前后端消息与通信规则 | 碰前后端交互时 |
 | `DECISIONS.md` | 决策与理由 | 想改已定方案前 |
 | `DEVLOG.md` | 开发日志：改了什么、为什么、影响面 | 排查历史 / 每次改完**必须写** |
+| `versioning.md` | **版本号规则**：怎么递增、提交信息格式、标签 | 提交前 |
 | `roadmap.md` | 交付范围与未实现功能 | 判断"这个该不该现在做" |
 | `modules/` | 每个模块的开发文档 | 改某个模块前**必读该模块** |
 | `guides/` | 操作手册：怎么做某一件事 | 新增能力时 |

@@ -112,7 +112,8 @@ pip install jsonschema
 Base/
 ├── README.md              项目入口
 ├── AGENTS.md              **AI 会话自动加载的规则入口**（每次动手前必读）
-├── .githooks/             git 钩子（提交前强制检查文档）
+├── VERSION                **应用版本号**（唯一版本源，脚本自动维护）
+├── .githooks/             git 钩子（提交前强制检查文档与版本号）
 ├── docs/                  全部文档（入口是 docs/README.md）
 │   ├── overview.md        本文件
 │   ├── README.md          文档地图
@@ -123,6 +124,7 @@ Base/
 │   ├── messages.md        消息清单
 │   ├── DECISIONS.md       决策与理由
 │   ├── DEVLOG.md          开发日志
+│   ├── versioning.md      版本号规则
 │   ├── roadmap.md         范围与未实现功能
 │   ├── modules/           每个模块一份开发文档
 │   └── guides/            操作手册
@@ -180,7 +182,7 @@ Base/
 | 阶段 | 要求 |
 | --- | --- |
 | **开发** | **改完即见**：前端用 dev server，后端直接跑源码。不需要手动构建或打包 |
-| **提交** | 代码有改动就必须更新 `docs/DEVLOG.md`，否则 **pre-commit 会拒绝提交** |
+| **提交** | 用 `python scripts/commit.py -m "描述"`：自动检查、递增版本号并提交。**直接 `git commit` 会被钩子拒绝**（版本号没递增） |
 | **交付** | 一条命令产出单个 exe。**打包后插件机制必须仍然可用**（一票否决项） |
 
 ---
