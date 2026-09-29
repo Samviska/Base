@@ -72,7 +72,7 @@
 ## 四、模块文档的写法
 
 - 模块文档统一放 `docs/modules/`，文件名用小写英文，与模块名一致。
-- **新建模块文档时复制 [`modules/_模板.md`](modules/_模板.md)**，不要另创格式。
+- **新建模块文档时复制 [`modules/_template.md`](modules/_template.md)**，不要另创格式。
 - `modules/` 与 `guides/` 的分工：
   - `modules/renderer.md` 讲**渲染器是什么、受什么规则约束**
   - `guides/add-renderer.md` 讲**怎么加一个渲染器**
