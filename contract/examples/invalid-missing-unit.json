@@ -7,7 +7,7 @@
   "series": [
     {
       "name": "温度",
-      "x": { "kind": "index", "data": [0, 1, 2] },
+      "x": { "kind": "sequence", "data": [0, 1, 2] },
       "y": { "data": [25.1, 25.3, 25.4] }
     }
   ]
