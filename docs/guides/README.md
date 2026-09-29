@@ -9,7 +9,8 @@
 
 | 文件 | 解决什么 |
 | --- | --- |
-| `framework-test.md` | **验证这套文档与规则在全新会话中是否还能用**（[acceptance.md](../acceptance.md) 的 S3 验收）。新会话第一条消息读它就够 |
+| `kickoff.md` | **新会话的开工入口**：项目要做什么、底线、动手前读什么、分六批的开发顺序 |
+| `framework-test.md` | 验证这套文档与规则在全新会话中是否还能用（[acceptance.md](../acceptance.md) 的 S3 验收前半段） |
 
 ---
 

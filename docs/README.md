@@ -27,6 +27,7 @@
 | 查验收标准、或 `S5` / `D3` 这类编号的含义 | [acceptance.md](acceptance.md) | — |
 | **验证这套文档与规则换会话后还能不能用** | [guides/framework-test.md](guides/framework-test.md) | — |
 | **第一次接触这个项目** | **[overview.md](overview.md)** | 本文件（文档地图） |
+| **要在新会话里开工写代码** | [guides/kickoff.md](guides/kickoff.md) | — |
 
 > **表里找不到你要做的事** → 说明文档有缺口，**先补文档再动手**。
 
