@@ -1,0 +1,198 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dsh-dataviz:contract:dataset",
+  "title": "Dataset",
+  "description": "嵌入式传感器数据的契约定义。字段语义与设计理由见 docs/contract.md。本 schema 只约束结构；跨字段的一致性（如 x 与 y 等长）由校验器补充检查。未知字段一律允许（契约要求读写时原样保留）。",
+  "type": "object",
+  "required": ["schema_version", "meta", "series"],
+  "properties": {
+    "schema_version": { "$ref": "#/$defs/schemaVersion" },
+    "meta": { "$ref": "#/$defs/meta" },
+    "series": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/series" }
+    },
+    "annotations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/annotation" }
+    }
+  },
+
+  "$defs": {
+    "schemaVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+$",
+      "description": "契约版本，形如 1.0。破坏性变更提升主版本。"
+    },
+
+    "meta": {
+      "type": "object",
+      "required": ["source", "extractor"],
+      "properties": {
+        "source": {
+          "type": "string",
+          "minLength": 1,
+          "description": "数据来源：日志文件名或设备标识"
+        },
+        "extractor": {
+          "type": "string",
+          "pattern": "^[^@]+@[^@]+$",
+          "description": "产出者标识，格式 插件名@版本"
+        },
+        "sample_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "notes": {
+          "type": "string",
+          "description": "提取过程中的特殊处理记录，例如时钟跳变是如何处理的"
+        }
+      }
+    },
+
+    "axis": {
+      "type": "object",
+      "required": ["kind", "data"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "minLength": 1,
+          "description": "核心已知四类：numeric / sequence / time / categorical。允许声明未知类型，但必须同时给 numeric_values。"
+        },
+        "data": { "type": "array" },
+        "scale": {
+          "enum": ["linear", "log"],
+          "default": "linear",
+          "description": "核心属性，必须是已知值"
+        },
+        "unit": { "type": "string" },
+        "origin": {
+          "description": "时间轴的基准点。kind 为 time 时必填。",
+          "oneOf": [
+            { "enum": ["epoch", "start"] },
+            { "type": "number" }
+          ]
+        },
+        "display_name": { "type": "string" },
+        "tick_format": { "type": "string" },
+        "monotonic": { "type": "boolean" },
+        "numeric_values": {
+          "type": "boolean",
+          "description": "声明未知 kind 时必填：这串值能否按数值处理，供渲染器降级使用"
+        },
+        "extensions": {
+          "type": "object",
+          "description": "插件自定义元信息。核心与通用渲染器都不解释，只透传。"
+        }
+      },
+      "allOf": [
+        {
+          "description": "time 轴必须声明基准点，否则无法确定刻度含义",
+          "if": {
+            "required": ["kind"],
+            "properties": { "kind": { "const": "time" } }
+          },
+          "then": { "required": ["origin"] }
+        },
+        {
+          "description": "未知 kind 必须声明 numeric_values，渲染器才能安全降级",
+          "if": {
+            "required": ["kind"],
+            "properties": {
+              "kind": { "not": { "enum": ["numeric", "sequence", "time", "categorical"] } }
+            }
+          },
+          "then": { "required": ["numeric_values"] }
+        },
+        {
+          "description": "categorical 的数据是字符串标签；其余是数值（允许 null 表示缺失）",
+          "if": {
+            "required": ["kind"],
+            "properties": { "kind": { "const": "categorical" } }
+          },
+          "then": {
+            "properties": { "data": { "items": { "type": ["string", "null"] } } }
+          },
+          "else": {
+            "properties": { "data": { "items": { "type": ["number", "null"] } } }
+          }
+        }
+      ]
+    },
+
+    "series": {
+      "type": "object",
+      "required": ["name", "unit", "x", "y"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "序列名，界面显示与注解引用都用它"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1,
+          "description": "单位。无量纲写 \"1\"，不允许空串"
+        },
+        "x": { "$ref": "#/$defs/axis" },
+        "y": {
+          "type": "object",
+          "required": ["data"],
+          "properties": {
+            "data": {
+              "type": "array",
+              "items": { "type": ["number", "null"] },
+              "description": "缺失值用 null，禁止用 0 / -1 代替"
+            },
+            "unit": {
+              "type": "string",
+              "description": "与 series.unit 不同时才需要"
+            }
+          }
+        }
+      }
+    },
+
+    "annotation": {
+      "type": "object",
+      "required": ["series", "kind"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "标注的唯一标识，由后端生成，供前端编辑与删除时引用"
+        },
+        "series": { "type": "string", "minLength": 1 },
+        "kind": { "enum": ["point", "range", "text"] },
+        "x": {
+          "description": "point 时是单个值；range 时是 [起, 止]；text 时可省略"
+        },
+        "label": { "type": "string" },
+        "note": { "type": "string" }
+      },
+      "allOf": [
+        {
+          "description": "point 与 range 必须给出位置",
+          "if": {
+            "required": ["kind"],
+            "properties": { "kind": { "enum": ["point", "range"] } }
+          },
+          "then": { "required": ["x"] }
+        },
+        {
+          "description": "range 的 x 必须是两个元素",
+          "if": {
+            "required": ["kind"],
+            "properties": { "kind": { "const": "range" } }
+          },
+          "then": {
+            "properties": {
+              "x": { "type": "array", "minItems": 2, "maxItems": 2 }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

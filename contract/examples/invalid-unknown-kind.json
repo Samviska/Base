@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0",
+  "meta": {
+    "source": "bad-unknown-kind.log",
+    "extractor": "demo-log@1.0.0"
+  },
+  "series": [
+    {
+      "name": "三轴合成加速度",
+      "unit": "m/s^2",
+      "x": {
+        "kind": "vector3-magnitude",
+        "data": [0, 1, 2]
+      },
+      "y": { "data": [9.81, 9.83, 9.79] }
+    }
+  ]
+}

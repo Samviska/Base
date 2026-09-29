@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "meta": {
+    "source": "bad-time-no-origin.log",
+    "extractor": "demo-log@1.0.0"
+  },
+  "series": [
+    {
+      "name": "温度",
+      "unit": "°C",
+      "x": { "kind": "time", "data": [0, 100, 200] },
+      "y": { "data": [25.1, 25.3, 25.4] }
+    }
+  ]
+}

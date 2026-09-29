@@ -11,6 +11,19 @@
 | `examples/` | 示例数据（供测试、插件自检、文档引用） |
 | `tests/` | 校验用例（含**故意非法**的样例，用于验证校验器能拒绝） |
 
+### 当前内容
+
+| 文件 | 用途 |
+| --- | --- |
+| `schema/dataset.schema.json` | **契约的唯一权威结构定义**（JSON Schema draft 2020-12）。单文件，内部用 `$defs` 组织，避免跨文件 `$ref` 带来的加载复杂度 |
+| `examples/example-basic.json` | 合法示例：多序列、`time` 轴、`categorical` 轴、`null` 缺失值、注解、`extensions` 未知字段 |
+| `examples/invalid-missing-unit.json` | 非法：`series.unit` 缺失 |
+| `examples/invalid-unknown-kind.json` | 非法：未知 `kind` 但未声明 `numeric_values` |
+| `examples/invalid-time-no-origin.json` | 非法：`time` 轴缺 `origin` |
+
+> schema 的 `$id` 使用 URN 形式，它只是**标识符**，不指向任何真实网站。
+> schema 只约束结构；**x 与 y 等长**这类跨字段检查由校验器补充实现（JSON Schema 无法表达）。
+
 ## 规则
 
 1. 契约定义**不依赖任何模块**；所有模块依赖它。

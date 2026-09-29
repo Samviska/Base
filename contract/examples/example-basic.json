@@ -1,0 +1,58 @@
+{
+  "schema_version": "1.0",
+  "meta": {
+    "source": "sensor_demo.log",
+    "extractor": "demo-log@1.0.0",
+    "sample_count": 5,
+    "notes": "示例数据。时间轴为相对上电时间，非绝对时间。"
+  },
+  "series": [
+    {
+      "name": "温度",
+      "unit": "°C",
+      "x": {
+        "kind": "time",
+        "origin": "start",
+        "unit": "ms",
+        "scale": "linear",
+        "monotonic": true,
+        "display_name": "时间",
+        "tick_format": "offset_seconds",
+        "data": [0, 100, 200, 300, 400]
+      },
+      "y": {
+        "data": [25.1, 25.3, null, 26.0, 26.2]
+      }
+    },
+    {
+      "name": "状态计数",
+      "unit": "1",
+      "x": {
+        "kind": "categorical",
+        "display_name": "状态",
+        "data": ["待机", "启动", "运行", "停止"],
+        "extensions": {
+          "category_order": ["待机", "启动", "运行", "停止"]
+        }
+      },
+      "y": {
+        "data": [1, 2, 3, 4]
+      }
+    }
+  ],
+  "annotations": [
+    {
+      "series": "温度",
+      "kind": "point",
+      "x": 300,
+      "label": "疑似异常",
+      "note": "温度出现跳变，需结合原始日志复核"
+    },
+    {
+      "series": "温度",
+      "kind": "range",
+      "x": [200, 300],
+      "label": "数据缺失区间"
+    }
+  ]
+}

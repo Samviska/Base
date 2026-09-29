@@ -19,10 +19,11 @@
 | 改前后端通信的消息 | [protocol.md](protocol.md) | [modules/server.md](modules/server.md) |
 | 改聚合算法 | [modules/aggregate.md](modules/aggregate.md) | [ARCHITECTURE.md](ARCHITECTURE.md) |
 | 查"这个决定当初为什么这么定" | [DECISIONS.md](DECISIONS.md) | — |
-| 确认能用什么技术、锁定什么版本 | [tech-stack.md](tech-stack.md) | [DECISIONS.md](DECISIONS.md) |
+| 查技术栈、版本、环境要求 | [overview.md](overview.md) | [DECISIONS.md](DECISIONS.md) |
+| 查前后端有哪些消息 | [messages.md](messages.md) | [protocol.md](protocol.md) |
 | 查"上次改了什么、为什么" | [DEVLOG.md](DEVLOG.md) | — |
 | 看还没做的功能 | [roadmap.md](roadmap.md) | — |
-| 第一次接触这个项目 | 本文件 | [ARCHITECTURE.md](ARCHITECTURE.md) |
+| **第一次接触这个项目** | **[overview.md](overview.md)** | 本文件（文档地图） |
 
 > **表里找不到你要做的事** → 说明文档有缺口，**先补文档再动手**。
 
@@ -35,7 +36,8 @@
 | `README.md` | 本文件：文档地图 | 每次开始干活前 |
 | `MODULES.md` | **模块地图**：模块 ↔ 代码位置 ↔ 文档 ↔ 可替换性 | 定位代码时 |
 | `ARCHITECTURE.md` | 全局架构、分层规则、依赖方向、显示策略 | 第一次接手 / 改动跨模块时 |
-| `tech-stack.md` | **技术要求清单**：技术选型、版本锁定、明确禁止、尚未确定项 | 动手写代码前 / 要引入新依赖时 |
+| `overview.md` | **技术总览**：技术栈与版本、开发环境、目录架构、注意事项 | **第一次接手时先读** |
+| `messages.md` | **消息清单**：前后端所有消息与 payload | 碰前后端交互时 |
 | `contract.md` | **数据契约**：字段、轴描述、校验、版本规则 | 碰数据结构时**必读** |
 | `protocol.md` | 前后端消息与通信规则 | 碰前后端交互时 |
 | `DECISIONS.md` | 决策与理由 | 想改已定方案前 |
