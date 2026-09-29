@@ -22,6 +22,8 @@
 | `U` | UI 层约束 | [ARCHITECTURE.md](ARCHITECTURE.md) §5 | U1–U6 |
 | `M` | 前后端消息 | [messages.md](messages.md) | M1–M17 |
 | `L` | 实时功能的待定问题 | [roadmap.md](roadmap.md) §3.2 | L1–L6 |
+| `C` | 通信模块的待办项 | [protocol.md](protocol.md) §6 | C1–C4 |
+| `T` | 框架自测项 | [guides/framework-test.md](guides/framework-test.md) §4 | T1–T8 |
 
 **两条约定**：
 
