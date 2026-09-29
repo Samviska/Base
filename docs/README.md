@@ -54,9 +54,13 @@
 
 | 层 | 机制 | 强制力 |
 | --- | --- | --- |
-| 1 | **[AGENTS.md](../AGENTS.md)**（项目根） | AI 会话**自动加载**，规则至少"被看到" |
-| 2 | **pre-commit 钩子**（`.githooks/`） | 代码有改动却没更新 `DEVLOG.md` → **提交被拒绝** |
-| 3 | `scripts/check_docs.py` | 链接 / JSON / 契约示例 / 模块登记，可随时或定期跑 |
+| 1 | **[AGENTS.md](../AGENTS.md)**（项目根） | DSH 自动加载（项目根有 `.git` 即生效），**不依赖 AI 主动去读** |
+| 2 | **各模块目录下的 `AGENTS.md`** | 碰到该目录时**按需注入**就地规则 |
+| 3 | **pre-commit 钩子** | 代码改动未更新 `DEVLOG.md`、或模块下增删文件未更新模块文档 → **提交被拒绝** |
+| 4 | `scripts/check_docs.py` | 链接 / JSON / 契约示例 / 模块登记，可随时或定期跑 |
+
+> **第 3 层是唯一不依赖模型配合的一层**：换任何 LLM 都绕不过 git。
+> 前两层若因换工具而失效，提交时的报错仍会说明该做什么。
 
 ```powershell
 python scripts/check_docs.py            # 全量检查

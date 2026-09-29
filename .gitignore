@@ -27,6 +27,10 @@ logs/
 _local/
 cache/
 
+# ---- 个人本地指令覆盖（不入库）----
+AGENTS.local.md
+CLAUDE.local.md
+
 # ---- 编辑器 / 系统 ----
 .vscode/
 .idea/

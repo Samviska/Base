@@ -74,6 +74,7 @@ git --version
 | **契约示例** | 用 schema 校验 `contract/examples/`；`invalid-` 开头的必须被拒绝 |
 | 模块登记 | `docs/modules/` 下的文档必须已在 `docs/MODULES.md` 登记 |
 | **文档更新** | 代码有改动时，`docs/DEVLOG.md` 必须同时更新 |
+| **模块文档同步** | 某模块目录下**新增或删除**文件时，该模块的 `docs/modules/*.md` 必须同时更新 |
 
 **契约示例的结构校验需要 `jsonschema`**：
 

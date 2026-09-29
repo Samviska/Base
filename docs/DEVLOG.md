@@ -49,6 +49,37 @@
 
 ## 记录
 
+### 2026-09-29 | 工具链 | 把"换 LLM 也能正常干活"变成机制
+
+**改动**：
+
+- 在 5 个模块目录放**就地 `AGENTS.md`**：`frontend/renderers/`、`backend/aggregate/`、
+  `backend/filters/`、`backend/sources/`、`contract/`
+- `scripts/check_docs.py` 增加**模块文档同步**检查（模块目录下增删文件 → 对应模块文档必须同批更新）
+- 根 `AGENTS.md` 增加"这套规则怎么保证被遵守"一节；`docs/README.md`、`docs/overview.md` 同步
+- 新增 `CLAUDE.md`（指向 `AGENTS.md`），兼容其它工具的入口约定
+- `.gitignore` 忽略 `AGENTS.local.md` / `CLAUDE.local.md`（个人本地覆盖，不入库）
+
+**原因**：换 LLM 或换会话时，规则可能根本没被读到，导致改动不写文档。
+原机制只有"项目根 `AGENTS.md` + 钩子查 DEVLOG"两条，不足以防住这件事。
+
+**根因**：任何依赖"AI 主动去读文档"的机制，换模型后必然衰减。
+必须让规则**被自动注入**（不依赖主动性），并让违规**被物理拒绝**（不依赖配合）。
+
+**影响面**：无契约变更。
+提交时新增一项检查：模块目录下新增或删除文件时，该模块的开发文档必须同批更新。
+
+**验证**：
+
+- 从 DSH 源码确认默认配置：`projectRootMarkers = ['.git']`、
+  `instructionFileCandidates = ['AGENTS.md', 'CLAUDE.md']`、`maxBytes = 65536`。
+  项目根有 `.git`，故 `AGENTS.md` 会被**自动注入每个会话**；子目录 `AGENTS.md` 按需注入。
+- 实测探针文件触发两条精确报错（DEVLOG 缺失、模块文档缺失），无误报
+- 修正了一处设计冲突：就地 `AGENTS.md` 曾被误判为"模块能力变化"，
+  已在过滤条件与 `IGNORED_SUFFIXES` 中排除
+
+**相关**：[AGENTS.md](../AGENTS.md)、[README.md](README.md) 维护规则、`scripts/check_docs.py`
+
 ### 2026-09-29 | 工具链 | 建立"文档不会漏写"的三层强制机制
 
 **改动**：新增 [AGENTS.md](../AGENTS.md)（会话自动加载的规则入口）、`.githooks/pre-commit`、

@@ -41,9 +41,23 @@
 
 ---
 
+## 这套规则怎么保证被遵守（换 LLM 也有效）
+
+| 层 | 机制 | 依赖什么 |
+| --- | --- | --- |
+| 1 | **本文件** | DSH 自动加载（项目根有 `.git` 即生效），**不依赖你主动去读** |
+| 2 | 各模块目录下的 `AGENTS.md`（如 `frontend/renderers/`、`backend/aggregate/`） | 碰到该目录时**按需注入** |
+| 3 | **pre-commit 钩子** | git 自己执行，**与 LLM 无关** |
+
+> **第 3 层是唯一不依赖模型配合的一层。**
+> 前两层若因换工具而失效，提交时钩子仍会拦住你，并在报错里说明该做什么。
+> 临时跳过：`SKIP_DOC_CHECK=1`，**并在提交信息里说明理由**。
+
+---
+
 ## 检查
 
 ```powershell
-python scripts/check_docs.py            # 全量检查：链接 / JSON / 契约示例 / 模块登记
+python scripts/check_docs.py            # 全量检查
 python scripts/check_docs.py --staged   # 提交前检查（pre-commit 自动调用）
 ```

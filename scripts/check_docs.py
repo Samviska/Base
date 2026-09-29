@@ -31,8 +31,23 @@ LINK_RE = re.compile(r"\]\(([^)\s]+\.(?:md|json))(?:#[^)]*)?\)")
 
 # 这些路径下出现实质改动时，要求同一提交里更新 DEVLOG
 CODE_PREFIXES = ("backend/", "frontend/", "contract/schema/", "contract/examples/")
-# 占位与纯说明文件不算实质改动
-IGNORED_SUFFIXES = (".gitkeep", "README.md")
+
+# 模块目录 → 该模块的开发文档。目录下**新增或删除**文件时，要求文档同步更新。
+# 只修改既有文件时不强制（避免改一行代码就要动文档），只在 stderr 提示。
+MODULE_DOC_MAP = {
+    "backend/core/": "docs/modules/core.md",
+    "backend/contract/": "docs/modules/contract.md",
+    "backend/sources/": "docs/modules/source.md",
+    "backend/filters/": "docs/modules/filter.md",
+    "backend/storage/": "docs/modules/storage.md",
+    "backend/aggregate/": "docs/modules/aggregate.md",
+    "backend/server/": "docs/modules/server.md",
+    "frontend/ui/": "docs/modules/ui-shell.md",
+    "frontend/api/": "docs/modules/api-client.md",
+    "frontend/renderers/": "docs/modules/renderer.md",
+}
+# 占位与纯说明文件不算实质改动（AGENTS.md 是就地规则，不代表模块能力变化）
+IGNORED_SUFFIXES = (".gitkeep", "README.md", "AGENTS.md")
 
 
 def rel(path: Path) -> str:
@@ -113,11 +128,41 @@ def check_module_registry() -> list[str]:
 
 
 def staged_files() -> list[str]:
+    return [p for _, p in staged_status()]
+
+
+def staged_status() -> list[tuple[str, str]]:
+    """返回 [(状态字母, 路径)]。状态：A 新增 / M 修改 / D 删除 / R 重命名。"""
     out = subprocess.run(
-        ["git", "diff", "--cached", "--name-only"],
+        ["git", "diff", "--cached", "--name-status"],
         cwd=ROOT, capture_output=True, text=True, check=True,
     )
-    return [line.strip() for line in out.stdout.splitlines() if line.strip()]
+    rows: list[tuple[str, str]] = []
+    for line in out.stdout.splitlines():
+        parts = line.split("\t")
+        if len(parts) >= 2:
+            rows.append((parts[0][:1], parts[-1].strip().replace("\\", "/")))
+    return rows
+
+
+def check_module_doc_sync(rows: list[tuple[str, str]]) -> list[str]:
+    """模块目录下新增或删除文件，说明该模块的能力变了，模块文档必须同步。"""
+    if os.environ.get("SKIP_DOC_CHECK") == "1":
+        return []
+    staged = {p for _, p in rows}
+    problems: list[str] = []
+    for prefix, doc in MODULE_DOC_MAP.items():
+        structural = [
+            p for st, p in rows
+            if p.startswith(prefix) and st in ("A", "D") and not p.endswith(IGNORED_SUFFIXES)
+        ]
+        if structural and doc not in staged:
+            sample = ", ".join(structural[:3]) + (" ..." if len(structural) > 3 else "")
+            problems.append(
+                f"{prefix} 下新增或删除了文件（{sample}），"
+                f"说明该模块的能力变了，但 {doc} 未在本提交中更新。"
+            )
+    return problems
 
 
 def check_docs_updated(staged: list[str]) -> list[str]:
@@ -143,7 +188,9 @@ def main() -> int:
     staged_only = "--staged" in sys.argv
     problems = check_links() + check_json() + check_contract_examples() + check_module_registry()
     if staged_only:
+        rows = staged_status()
         problems += check_docs_updated(staged_files())
+        problems += check_module_doc_sync(rows)
 
     if problems:
         print("\n检查未通过：")
