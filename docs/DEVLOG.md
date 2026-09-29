@@ -49,6 +49,37 @@
 
 ## 记录
 
+### 2026-09-29 | 工具链 | 确定依赖管理：虚拟环境 + requirements.txt
+
+**改动**：
+
+- 新增 `requirements.txt`：只列**直接依赖**，版本写死（`jsonschema==4.26.0`）
+- 新增 `.venv` 虚拟环境（`.gitignore` 已含 `.venv/`，无需改动）
+- `.githooks/pre-commit` 改为**优先使用项目虚拟环境的解释器**
+  （`.venv/Scripts/python.exe` 或 `.venv/bin/python`，都没有才退回系统 python）
+- `scripts/setup.py` 扩展为三步：建虚拟环境 → 装依赖 → 启用钩子
+- `.github/workflows/check.yml` 改用 `pip install -r requirements.txt`
+- `README.md`、`docs/overview.md` 同步（新增 §3.5 依赖管理）
+
+**原因**：程序依赖别人写的库，需要决定"记在哪"和"装在哪"。
+机器全局环境已装 **89 个与本项目无关的包**，混用会导致版本冲突，
+打包 exe 时也容易带上无关库。
+
+**为什么不用 uv / poetry**：本项目后端依赖预计只有 3~5 个，手工钉版本足够可控，
+额外工具只增加学习与打包成本。**升级触发条件**：依赖超过 10 个，或需要区分开发/运行依赖。
+
+**影响面**：无契约变更。
+**此后提交前检查会使用 `.venv` 里的解释器**——这修掉了一个隐患：
+原钩子用全局 python，那里没有 `jsonschema`，会导致检查失败而拒绝提交。
+
+**验证**：
+
+- `python scripts/setup.py` 可重复执行（幂等），不会重复建环境或报错
+- `.venv\Scripts\python.exe scripts\check_docs.py` 输出「文档与契约检查通过」
+- 提交时钩子实际走的是虚拟环境解释器
+
+**相关**：[overview.md](overview.md) §3.4、§3.5
+
 ### 2026-09-29 | 工具链 | 接入远端仓库与 CI
 
 **改动**：

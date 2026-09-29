@@ -26,7 +26,7 @@ jobs:
           python-version: '3.11'
 
       - name: 安装依赖
-        run: pip install jsonschema
+        run: pip install -r requirements.txt
 
       - name: 文档与契约全量检查
         run: python scripts/check_docs.py

@@ -45,12 +45,12 @@
 ## 首次使用（clone 后必做）
 
 ```powershell
-python scripts/setup.py      # 启用 git 钩子
-pip install jsonschema       # 契约校验依赖
+python scripts/setup.py
 ```
 
-> `core.hooksPath` 是**本地配置**，不随仓库分发。漏掉第一步不会有任何报错，
-> 但**所有提交前检查都会静默失效**。
+一条命令：建 `.venv` 虚拟环境 → 按 `requirements.txt` 装依赖 → 启用 git 钩子。
+
+> 钩子未启用不会有任何报错，但**所有提交前检查都会静默失效**。
 
 ---
 

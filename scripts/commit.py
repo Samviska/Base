@@ -32,6 +32,19 @@ CONTRACT_PREFIXES = ("contract/schema/", "contract/examples/")
 CODE_ROOTS = ("backend", "frontend", "plugins")
 
 
+def project_python() -> str:
+    """项目解释器：优先用虚拟环境里的那个。
+
+    依赖装在 .venv 里。若沿用"启动本脚本的解释器"（可能是系统 python），
+    预检会因缺少 jsonschema 而失败——那是环境问题，不是代码问题。
+    """
+    for rel in (".venv/Scripts/python.exe", ".venv/bin/python"):
+        candidate = ROOT / rel
+        if candidate.exists():
+            return str(candidate)
+    return sys.executable
+
+
 def git(*args: str) -> subprocess.CompletedProcess:
     # Windows 上 subprocess 默认按 locale(GBK) 解码，而 git 与钩子输出 UTF-8，必须显式指定
     return subprocess.run(
@@ -100,7 +113,7 @@ def main() -> int:
 
     # 预检跳过版本号检查：递增发生在其后。真正的强制由 git commit 触发的钩子完成
     check = subprocess.run(
-        [sys.executable, "scripts/check_docs.py", "--staged", "--skip-version"], cwd=ROOT
+        [project_python(), "scripts/check_docs.py", "--staged", "--skip-version"], cwd=ROOT
     )
     if check.returncode != 0:
         sys.exit("检查未通过，已中止提交（未改动 VERSION）")

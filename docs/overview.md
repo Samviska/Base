@@ -98,13 +98,36 @@ pip install jsonschema
 ### 3.4 首次搭建
 
 ```powershell
-python scripts/setup.py      # 启用 git 钩子（不执行则所有检查静默失效）
-pip install jsonschema       # 契约校验依赖
+python scripts/setup.py
 ```
 
-> **待补**：后端依赖管理方式尚未确定（见 §7），确定后补充本节。
+一条命令做三件事：建 `.venv` 虚拟环境 → 按 `requirements.txt` 装依赖 → 启用 git 钩子。
 
-### 3.5 换工具 / 换模型时
+**跑完自检**：
+
+```powershell
+.venv\Scripts\python.exe scripts\check_docs.py     # 应输出「文档与契约检查通过」
+```
+
+> 钩子必须启用，否则所有提交前检查都会静默失效（见 §3.3 的已知限制）。
+
+### 3.5 依赖管理
+
+| 项 | 规定 |
+| --- | --- |
+| 依赖清单 | `requirements.txt`，**版本写死**（`==`） |
+| 安装位置 | 项目自己的 `.venv`，**不装进全局环境** |
+| 只列直接依赖 | 传递依赖由 pip 自动解析。依赖少，足够可控 |
+| 不引入 uv / poetry | 依赖超过 10 个、或需要区分开发依赖时再评估 |
+
+**为什么必须用虚拟环境**：全局环境里已经有大量与本项目无关的包，
+混在一起既容易版本冲突，打包 exe 时也容易带上无关库。
+
+**解释器路径**：Windows 是 `.venv\Scripts\python.exe`，Linux / macOS 是 `.venv/bin/python`。
+**不要"激活"虚拟环境**——PowerShell 默认禁止执行 `Activate.ps1`，直接指定解释器更可靠，
+脚本里也好写。`pre-commit` 钩子与 CI 都遵循这个规则。
+
+### 3.6 换工具 / 换模型时
 
 规则本身与工具无关；"规则怎么被送到模型面前"与工具有关。
 
@@ -207,11 +230,10 @@ Base/
 
 | 项 | 建议 | 影响 |
 | --- | --- | --- |
-| **后端依赖管理方式** | `requirements.txt`（最省事）或 `pyproject.toml` + `uv`（更现代） | 环境搭建与打包 |
 | 代码格式化 / 静态检查 | Python 侧先只用 ruff；前端暂不引入 lint | 协作一致性，可后补 |
 | 测试框架 | Python 用 pytest；前端用 Vitest | "插件自检方式"的实现 |
 
-> 上表未定项**不阻塞文档工作，但阻塞写代码**。
+> 依赖管理已定，见 §3.5。上表未定项**不阻塞文档与架构工作**。
 
 ---
 
