@@ -63,7 +63,29 @@ node --version     # 期望 v18 或更高
 git --version
 ```
 
-### 3.3 首次搭建
+### 3.3 提交前的自动检查
+
+提交时会自动运行 `scripts/check_docs.py --staged`（由 `.githooks/pre-commit` 调用）：
+
+| 检查项 | 说明 |
+| --- | --- |
+| 文档链接 | `docs/` 内的相对链接是否有效 |
+| JSON 语法 | `contract/` 下所有 JSON |
+| **契约示例** | 用 schema 校验 `contract/examples/`；`invalid-` 开头的必须被拒绝 |
+| 模块登记 | `docs/modules/` 下的文档必须已在 `docs/MODULES.md` 登记 |
+| **文档更新** | 代码有改动时，`docs/DEVLOG.md` 必须同时更新 |
+
+**契约示例的结构校验需要 `jsonschema`**：
+
+```powershell
+pip install jsonschema
+```
+
+未安装时该项会跳过并提示，不阻止提交。
+
+临时跳过文档更新检查：`SKIP_DOC_CHECK=1 git commit ...`，并在提交信息里说明理由。
+
+### 3.4 首次搭建
 
 > **待补**：后端依赖管理方式尚未确定（见 §7），确定后补充本节。
 
@@ -74,6 +96,8 @@ git --version
 ```
 Base/
 ├── README.md              项目入口
+├── AGENTS.md              **AI 会话自动加载的规则入口**（每次动手前必读）
+├── .githooks/             git 钩子（提交前强制检查文档）
 ├── docs/                  全部文档（入口是 docs/README.md）
 │   ├── overview.md        本文件
 │   ├── README.md          文档地图
@@ -141,6 +165,7 @@ Base/
 | 阶段 | 要求 |
 | --- | --- |
 | **开发** | **改完即见**：前端用 dev server，后端直接跑源码。不需要手动构建或打包 |
+| **提交** | 代码有改动就必须更新 `docs/DEVLOG.md`，否则 **pre-commit 会拒绝提交** |
 | **交付** | 一条命令产出单个 exe。**打包后插件机制必须仍然可用**（一票否决项） |
 
 ---

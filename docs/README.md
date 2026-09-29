@@ -50,6 +50,23 @@
 
 ## 维护规则
 
+### 规则由什么强制（不靠自觉）
+
+| 层 | 机制 | 强制力 |
+| --- | --- | --- |
+| 1 | **[AGENTS.md](../AGENTS.md)**（项目根） | AI 会话**自动加载**，规则至少"被看到" |
+| 2 | **pre-commit 钩子**（`.githooks/`） | 代码有改动却没更新 `DEVLOG.md` → **提交被拒绝** |
+| 3 | `scripts/check_docs.py` | 链接 / JSON / 契约示例 / 模块登记，可随时或定期跑 |
+
+```powershell
+python scripts/check_docs.py            # 全量检查
+python scripts/check_docs.py --staged   # 提交前检查（钩子自动调用）
+```
+
+临时跳过：`SKIP_DOC_CHECK=1 git commit ...`，**并在提交信息里说明理由**。
+
+### 规则正文
+
 1. **改了某个模块的代码，必须同步更新 `modules/` 下对应的文档。**
 2. **每次代码改动，必须在 `DEVLOG.md` 追加一条**（格式见该文件顶部）。
 3. **契约变更**（`contract.md`）必须：提升版本号 → 更新校验器 → 在 `DEVLOG.md` 标注影响面。

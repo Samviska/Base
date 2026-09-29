@@ -1,0 +1,17 @@
+#!/bin/sh
+# 提交前检查：文档一致性 + 代码改动是否伴随 DEVLOG 更新。
+#
+# 由 scripts/check_docs.py 实现全部逻辑，本文件只负责调用。
+# 需要临时跳过：SKIP_DOC_CHECK=1 git commit ...（并在提交信息里说明理由）
+#
+# 找不到 python 时不阻止提交，只提示——避免环境问题卡住所有人。
+if command -v python >/dev/null 2>&1; then
+  PY=python
+elif command -v py >/dev/null 2>&1; then
+  PY=py
+else
+  echo "[pre-commit] 未找到 python，跳过文档一致性检查"
+  exit 0
+fi
+
+"$PY" scripts/check_docs.py --staged
