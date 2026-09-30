@@ -40,7 +40,8 @@ export const strings = {
 
   aggregatedOn: '当前为聚合显示（每像素列取 min/max）',
   aggregatedOff: '原始点显示',
-  points: '点数',
+  dataPoints: '数据',
+  drawPoints: '本次绘制',
   viewport: '视口',
 
   errorCodes: {

@@ -43,14 +43,16 @@ function toggle(name) {
       <span class="label">{{ strings.filePath }}</span>
       <input
         type="text"
+        data-testid="file-path"
         :value="path"
         :disabled="busy"
         @input="emit('update:path', $event.target.value)"
         @keyup.enter="emit('open')"
       />
-      <button :disabled="busy" @click="emit('browse')">{{ strings.browse }}</button>
+      <button data-testid="browse" :disabled="busy" @click="emit('browse')">{{ strings.browse }}</button>
       <span class="label">{{ strings.sourcePlugin }}</span>
       <select
+        data-testid="source-plugin"
         :value="pluginId"
         :disabled="busy || !plugins.length"
         @change="emit('update:pluginId', $event.target.value)"
@@ -59,7 +61,9 @@ function toggle(name) {
           {{ item.display_name }}
         </option>
       </select>
-      <button :disabled="busy || !plugins.length" @click="emit('open')">{{ strings.open }}</button>
+      <button data-testid="open-file" :disabled="busy || !plugins.length" @click="emit('open')">
+        {{ strings.open }}
+      </button>
     </div>
 
     <!-- 参数控件由插件的参数声明生成：新增插件、新增参数都不需要改这里 -->
@@ -69,6 +73,7 @@ function toggle(name) {
         <span>{{ decl.display_name || decl.name }}</span>
         <select
           v-if="decl.type === 'enum'"
+          :data-testid="`param-${decl.name}`"
           :value="options[decl.name]"
           :disabled="busy"
           @change="setOption(decl, $event.target.value)"
@@ -77,6 +82,7 @@ function toggle(name) {
         </select>
         <input
           v-else
+          :data-testid="`param-${decl.name}`"
           :type="decl.type === 'int' || decl.type === 'float' ? 'number' : 'text'"
           :value="options[decl.name]"
           :disabled="busy"
@@ -93,6 +99,7 @@ function toggle(name) {
       <label v-for="item in series" :key="item.name" class="check">
         <input
           type="checkbox"
+          :data-testid="`series-${item.name}`"
           :checked="selected.includes(item.name)"
           @change="toggle(item.name)"
         />

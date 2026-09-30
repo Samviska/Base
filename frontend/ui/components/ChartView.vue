@@ -42,7 +42,7 @@ defineExpose({
 </script>
 
 <template>
-  <div ref="host" class="chart"></div>
+  <div ref="host" class="chart" data-testid="chart"></div>
 </template>
 
 <style scoped>

@@ -58,6 +58,7 @@ renderer.on(event, handler)      // 返回取消订阅函数
 | `x.unit` | 横轴标题里的单位，如「采样序号（sample）」「时间（ms）」 |
 | `x.kind: time` + `tick_format: offset_seconds` | 刻度显示相对基准的偏移，如 `+12.5s` |
 | `x.kind: sequence` | 刻度显示整数序号 |
+| 刻度数值 | 上万的用 `k`、上百万的用 `M`（`882134` → `882k`）：刻度要能一眼读出来 |
 | `x.kind` 未知 | 按数值轴绘制，并在画布上标注「轴类型 xxx 不认识」（不崩、不静默） |
 | `x.scale: log` | 暂按线性绘制并标注（对数轴本期不做） |
 | `series.unit` | 纵轴单位（画布左上角） |

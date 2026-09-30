@@ -12,9 +12,9 @@ import test from 'node:test'
 import { createRenderer, zoomRange } from '../renderers/builtin/line.js'
 
 const SIZE = { width: 800, height: 400 }
-const MARGIN_LEFT = 60
-const MARGIN_TOP = 14
-const MARGIN_BOTTOM = 30
+// 轴带位置直接取画布边缘，不写死边距：以后调边距不该让用例跟着改
+const Y_AXIS_BAND_X = 20
+const X_AXIS_BAND_Y = SIZE.height - 10
 
 function fakeContext(record) {
   let stroke = ''
@@ -168,7 +168,7 @@ test('纵轴带滚轮只缩放纵轴：不发 zoom 事件，但画面被拉伸',
   const before = paintedSpanY(dom.record)
   assert.ok(before > 0, '前置条件：数据已经画出来了')
 
-  dom.listeners.get('wheel')(wheel({ offsetX: MARGIN_LEFT - 20 }))
+  dom.listeners.get('wheel')(wheel({ offsetX: Y_AXIS_BAND_X }))
   dom.flush()
   const after = paintedSpanY(dom.record)
 
@@ -180,7 +180,7 @@ test('双击恢复纵轴自动适应', () => {
   const { dom } = mounted()
   const before = paintedSpanY(dom.record)
 
-  dom.listeners.get('wheel')(wheel({ offsetX: MARGIN_LEFT - 20 }))
+  dom.listeners.get('wheel')(wheel({ offsetX: Y_AXIS_BAND_X }))
   dom.flush()
   const zoomed = paintedSpanY(dom.record)
   assert.ok(zoomed > before * 1.1, '前置条件：纵轴已被缩放')
@@ -208,7 +208,7 @@ test('底部横轴带滚轮一样缩放横轴', () => {
   const zooms = []
   renderer.on('zoom', (view) => zooms.push(view))
 
-  const axisBandY = MARGIN_TOP + (SIZE.height - MARGIN_TOP - MARGIN_BOTTOM) + 10
+  const axisBandY = X_AXIS_BAND_Y
   dom.listeners.get('wheel')(wheel({ offsetY: axisBandY }))
 
   assert.equal(zooms.length, 1)
@@ -218,7 +218,7 @@ test('底部横轴带滚轮一样缩放横轴', () => {
 test('光标提示当前能缩放哪条轴', () => {
   const { dom } = mounted()
 
-  dom.listeners.get('pointermove')({ offsetX: MARGIN_LEFT - 20, offsetY: 200 })
+  dom.listeners.get('pointermove')({ offsetX: Y_AXIS_BAND_X, offsetY: 200 })
   assert.equal(dom.canvas.style.cursor, 'ns-resize')
 
   dom.listeners.get('pointermove')({ offsetX: 400, offsetY: 390 })

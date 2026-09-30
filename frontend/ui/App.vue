@@ -27,7 +27,8 @@ const units = ref({})
 const fullRange = ref(null)
 const viewport = ref(null)
 const aggregated = ref(false)
-const points = ref(0)
+const dataPoints = ref(0) // 数据总量（M3 摘要给的是全量点数）
+const drawPoints = ref(0) // 本次绘制点数（M6 响应里的点数，聚合时远小于总量）
 const errorText = ref('')
 const busy = ref(false)
 const datasetId = ref(0)
@@ -39,7 +40,7 @@ const loader = createViewportLoader({
   request: (job) => client.request('query_range', job),
   onData: (payload) => {
     aggregated.value = payload.aggregated
-    points.value = payload.series.reduce((sum, item) => sum + item.x.length, 0)
+    drawPoints.value = payload.series.reduce((sum, item) => sum + item.x.length, 0)
     chart.value?.applyData(payload)
   },
   onError: showError,
@@ -113,7 +114,8 @@ async function openFile() {
     units.value = Object.fromEntries(summary.series.map((item) => [item.name, item.unit]))
     selected.value = summary.series.map((item) => item.name)
     aggregated.value = false
-    points.value = 0
+    drawPoints.value = 0
+    dataPoints.value = summary.series.reduce((sum, item) => sum + (item.point_count || 0), 0)
 
     // 顺序要紧：渲染器在 mount 时读取 fullRange，先重建再赋值它就只能读到旧值
     // （"双击回不到全览"就是这么来的）
@@ -165,7 +167,9 @@ onBeforeUnmount(() => {
       </div>
       <div class="conn">
         <span class="muted">{{ strings.backend }}：{{ backendUrl }}</span>
-        <button :disabled="!fullRange" @click="resetView">{{ strings.resetView }}</button>
+        <button data-testid="reset-view" :disabled="!fullRange" @click="resetView">
+          {{ strings.resetView }}
+        </button>
         <button :disabled="connection === 'connecting'" @click="connect">
           {{ strings.reconnect }}
         </button>
@@ -210,7 +214,8 @@ onBeforeUnmount(() => {
     <StatusBar
       :connection="connection"
       :aggregated="aggregated"
-      :points="points"
+      :data-points="dataPoints"
+      :draw-points="drawPoints"
       :viewport="viewport"
       :warnings="warnings"
       :error="errorText"

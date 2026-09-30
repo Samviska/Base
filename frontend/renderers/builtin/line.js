@@ -8,7 +8,7 @@
 // Canvas 不是响应式的：任何数据或视口变化都必须显式重绘（本文件统一走 requestDraw）。
 
 const COLORS = ['#1e88e5', '#e53935', '#43a047', '#fb8c00', '#8e24aa', '#00acc1']
-const MARGIN = { left: 60, right: 16, top: 14, bottom: 30 }
+const MARGIN = { left: 60, right: 16, top: 14, bottom: 44 }
 const TICKS = 4 // 每条轴的刻度段数
 
 // 核心认识的四类轴；其余按数值轴降级显示并标注（contract.md §4.2）
@@ -345,7 +345,8 @@ export function createRenderer({ container, options = {} }) {
       ctx.lineTo(px, rect.top + rect.height)
       ctx.stroke()
       const value = view.x0 + ((view.x1 - view.x0) * i) / TICKS
-      ctx.textAlign = 'center'
+      // 首尾刻度贴边对齐，否则文字会溢出绘图区、压到轴标题上
+      ctx.textAlign = i === 0 ? 'left' : i === TICKS ? 'right' : 'center'
       ctx.fillText(formatTick(value, axis), px, rect.top + rect.height + 16)
     }
 
@@ -366,9 +367,10 @@ export function createRenderer({ container, options = {} }) {
     const first = state.series[0]
     const title = [axis.display_name || first?.name || '', axis.unit ? `（${axis.unit}）` : ''].join('')
     if (title) {
+      // 左对齐：右端留给最后一个刻度标签，两者不再叠在一起
       ctx.fillStyle = '#546e7a'
-      ctx.textAlign = 'right'
-      ctx.fillText(title, rect.left + rect.width, cssHeight - 8)
+      ctx.textAlign = 'left'
+      ctx.fillText(title, rect.left, cssHeight - 10)
     }
     const unit = first ? units[first.name] : ''
     if (unit) {
@@ -544,7 +546,9 @@ export function formatTick(value, axis = {}) {
 function formatNumber(value) {
   if (!Number.isFinite(value)) return '-'
   const abs = Math.abs(value)
-  if (abs >= 1e6 || (abs > 0 && abs < 1e-3)) return value.toExponential(1)
+  // 刻度标签要能一眼读出来：六位数写成 882k，比 882134 好认
+  if (abs >= 1e6) return `${(value / 1e6).toFixed(1)}M`
+  if (abs >= 1e4) return `${Math.round(value / 1e3)}k`
   if (abs >= 1000) return value.toFixed(0)
   if (abs >= 10) return value.toFixed(1)
   return value.toFixed(2)

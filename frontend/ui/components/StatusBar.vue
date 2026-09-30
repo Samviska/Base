@@ -6,7 +6,8 @@ import { strings } from '../strings.js'
 const props = defineProps({
   connection: { type: String, default: 'idle' },
   aggregated: { type: Boolean, default: false },
-  points: { type: Number, default: 0 },
+  dataPoints: { type: Number, default: 0 },
+  drawPoints: { type: Number, default: 0 },
   viewport: { type: Object, default: null },
   warnings: { type: Array, default: () => [] },
   error: { type: String, default: '' },
@@ -26,16 +27,20 @@ function format(value) {
 
 <template>
   <footer class="bar">
-    <span :class="['dot', connection]">{{ stateText }}</span>
+    <span :class="['dot', connection]" data-testid="status-connection">{{ stateText }}</span>
     <!-- 是否处于聚合显示必须看得见：否则会把 min/max 线段误当成原始波形 -->
-    <span :class="['tag', aggregated ? 'on' : '']">
+    <span :class="['tag', aggregated ? 'on' : '']" data-testid="status-aggregated">
       {{ aggregated ? strings.aggregatedOn : strings.aggregatedOff }}
     </span>
-    <span>{{ strings.points }}：{{ points }}</span>
-    <span>{{ strings.viewport }}：{{ viewportText }}</span>
+    <!-- 两个点数必须分开写：聚合时"本次绘制"远小于数据总量，混在一起会让人以为数据丢了 -->
+    <span data-testid="status-data-points">{{ strings.dataPoints }}：{{ dataPoints }}</span>
+    <span data-testid="status-draw-points">{{ strings.drawPoints }}：{{ drawPoints }}</span>
+    <span data-testid="status-viewport">{{ strings.viewport }}：{{ viewportText }}</span>
     <!-- 坏插件不该让应用起不来，但使用者必须知道它坏了（S4） -->
-    <span v-if="warnings.length" class="warn">{{ warnings.join('；') }}</span>
-    <span v-if="error" class="error">{{ error }}</span>
+    <span v-if="warnings.length" class="warn" data-testid="status-warnings">
+      {{ warnings.join('；') }}
+    </span>
+    <span v-if="error" class="error" data-testid="status-error">{{ error }}</span>
   </footer>
 </template>
 

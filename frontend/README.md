@@ -23,11 +23,17 @@
 npm install          # 首次
 npm run dev          # → http://127.0.0.1:5173/
 
-# 3) 测试与构建检查
-npm test             # 默认跳过"需要真后端"的用例
-$env:BACKEND_URL = "ws://127.0.0.1:8765"; npm test   # 连上真后端一起跑
+# 3) 测试
+npm test             # 单元与交互用例（Node 内置 test runner，假 DOM）
+npm run e2e          # 真实浏览器内测（Playwright + 系统 Edge），需先起好后端与 dev server
 npm run build        # 只在交付时用；开发期改完即见
 ```
+
+**内测**（`npm run e2e`）会把"选日志 → 出图 → 缩放 / 平移 / 双击 / 全览"整条路走一遍，
+并截图到 `_local/e2e-*.png`。它用**系统自带的 Edge**，不需要下载浏览器。
+
+> **跑内测前先重启 dev server**：Vite 的 HMR 会累积状态，页面可能仍停留在旧代码上
+> （表现为"改了没效果"）。这类假象会浪费很多时间。
 
 后端换端口时，页面用 `?backend=ws://127.0.0.1:8791` 指定，不必改代码。
 
