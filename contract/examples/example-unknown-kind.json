@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.0",
+  "meta": {
+    "source": "vector_demo.log",
+    "extractor": "demo-log@1.0.0",
+    "sample_count": 3,
+    "notes": "x 轴声明了核心不认识的 kind，必须同时给 numeric_values；渲染器按契约降级为数值轴并明确标注。"
+  },
+  "series": [
+    {
+      "name": "三轴合成加速度",
+      "unit": "m/s^2",
+      "x": {
+        "kind": "vector3-magnitude",
+        "numeric_values": true,
+        "display_name": "采样序号",
+        "data": [0, 1, 2]
+      },
+      "y": {
+        "data": [9.81, 9.83, 9.79]
+      }
+    }
+  ]
+}

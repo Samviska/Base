@@ -49,6 +49,44 @@
 
 ## 记录
 
+### 2026-09-30 | 契约 | 校验器落地：schema + 跨字段检查，接入 pre-commit 与 CI
+
+**改动**：
+
+- 新增 `backend/contract/`：`validator.py` 实现 `validate(data)` / `validate_file(path)`，
+  `__init__.py` 导出 `ValidationResult` / `Violation`。违规项带字段路径（如 `series[0].unit`）、
+  原因与触发关键字；`error_detail()` 直接对上 M 消息 `CONTRACT_VIOLATION` 的 `detail`
+- 新增 `backend/tests/test_contract.py`（标准库 unittest，13 个用例）与 `backend/__init__.py`
+- `scripts/check_docs.py` 的示例校验改走该校验器，并新增要求：
+  `invalid-` 示例必须被拒绝**且给出字段路径**（原来只要求"被拒绝"）
+- `contract/examples/` 补两份：`example-unknown-kind.json`（未知 `kind` + `numeric_values` 的**合法**例）、
+  `invalid-length-mismatch.json`（`x.data` 与 `y.data` 不等长）
+- 同步 `docs/modules/contract.md`（路径、接口表、第 5 条硬规则、坑表）、
+  `contract/README.md`（示例清单 + 怎么校验）、`docs/overview.md` §3.3 检查项描述、
+  `docs/acceptance.md` §6 勾选两项
+
+**原因**：kickoff §五 第 1 批——把契约从"文档里的定义"变成"能执行的校验器"。
+此前示例校验直接写在检查脚本里，没有跨字段检查；未知 `kind` 只有非法例、
+没有合法例，无法证明校验器是"允许未知类型"而不是误拒（S6 的结构前提）。
+
+**影响面**：契约**结构未变**，`schema_version` 仍为 `1.0`，**无需迁移**；
+新增的是可执行校验，不含新规则——跨字段检查只实现契约已明示的 `x`/`y` 等长，
+`annotation.series` 引用存在性、序列名唯一等**未实现**（那些属收紧契约，要走变更流程）。
+`scripts/check_docs.py` 新增对 `backend/contract` 的导入（仓库根加入 `sys.path`），
+缺 `jsonschema` 或导入失败仍判失败，不静默跳过。
+后续模块（数据源自校验、后端错误提示）统一调用 `validate` / `validate_file`，不再各写一套。
+
+**验证**：
+
+- `.venv\Scripts\python.exe -m unittest discover -s backend/tests -t . -v` → 13 个用例通过
+- `.venv\Scripts\python.exe scripts\check_docs.py` → 「文档与契约检查通过」（exit=0）
+- 6 份示例：2 份合法通过，4 份非法被拒绝并给出路径
+  （`series[0]`、`series[0].x`、`series[0].y.data`）
+- 未知字段不丢：`example-basic.json` 的 `x.extensions` 在 JSON 往返后逐字段一致
+
+**相关**：[guides/kickoff.md](guides/kickoff.md) §五 第 1 批、[modules/contract.md](modules/contract.md)、
+[contract.md](contract.md) §8、[acceptance.md](acceptance.md) §6
+
 ### 2026-09-29 | 文档体系 | kickoff.md 改定位：从"开工入口"改为正式开发提示词
 
 **改动**：重写 `docs/guides/kickoff.md`。标题改为《项目开发提示词》，

@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "meta": {
+    "source": "bad-length-mismatch.log",
+    "extractor": "demo-log@1.0.0"
+  },
+  "series": [
+    {
+      "name": "温度",
+      "unit": "°C",
+      "x": { "kind": "sequence", "data": [0, 1, 2] },
+      "y": { "data": [25.1, 25.3] }
+    }
+  ]
+}

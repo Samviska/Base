@@ -2,11 +2,12 @@
 # -*- coding: utf-8 -*-
 """文档与契约的一致性检查。
 
-全量模式：链接有效性、JSON 语法、契约示例与 schema 的一致性、模块文档是否已登记、
+全量模式：链接有效性、JSON 语法、契约示例与契约校验器的一致性、模块文档是否已登记、
 文档里的编号引用是否落在登记范围内。
 --staged 模式：额外要求"代码有改动就必须更新 docs/DEVLOG.md"（pre-commit 使用）。
 
-契约示例的校验依赖 jsonschema；**未安装时判失败**——静默跳过的校验等于没有校验。
+契约示例由 backend/contract 的校验器校验（依赖 jsonschema）；
+**缺依赖或校验器导入失败时判失败**——静默跳过的校验等于没有校验。
 跳过文档更新检查：设置 SKIP_DOC_CHECK=1，并在提交信息里说明理由。
 """
 from __future__ import annotations
@@ -102,29 +103,50 @@ def check_json() -> list[str]:
 
 
 def check_contract_examples() -> list[str]:
-    """用 schema 校验示例。文件名以 invalid- 开头的期望被拒绝。"""
+    """用契约校验器校验示例（只此一处实现，跨字段规则也走它）。
+
+    文件名以 invalid- 开头的期望被拒绝，**且必须给出出错字段路径**：
+    报"数据不合法"而不知哪儿错，等于没校验。
+    """
     schema_path = ROOT / "contract" / "schema" / "dataset.schema.json"
     examples_dir = ROOT / "contract" / "examples"
     if not schema_path.exists():
         return [f"缺少 {rel(schema_path)}"]
+
+    # 本脚本在 scripts/ 下执行，仓库根不在 sys.path 里；校验器按 backend.contract 导入
+    if str(ROOT) not in sys.path:
+        sys.path.insert(0, str(ROOT))
     try:
-        from jsonschema import Draft202012Validator
-    except ImportError:
+        from backend.contract import validate
+    except ImportError as exc:
         # 契约校验是核心保障。静默跳过等于没有校验，所以这里必须判失败
         return [
-            "未安装 jsonschema，契约示例无法校验。",
-            "  安装：pip install jsonschema",
+            f"契约校验器无法导入：{exc}",
+            "  安装依赖：pip install jsonschema",
         ]
 
-    validator = Draft202012Validator(json.loads(schema_path.read_text(encoding="utf-8")))
     problems: list[str] = []
     for f in sorted(examples_dir.glob("*.json")):
         expect_valid = not f.name.startswith("invalid-")
-        errors = list(validator.iter_errors(json.loads(f.read_text(encoding="utf-8"))))
-        if expect_valid and errors:
-            problems.append(f"{rel(f)}: 期望合法却被拒绝 -> {errors[0].message}")
-        if not expect_valid and not errors:
-            problems.append(f"{rel(f)}: 期望非法却通过了校验（校验器在放水）")
+        try:
+            data = json.loads(f.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            problems.append(f"{rel(f)}: JSON 语法错误 -> {exc}")
+            continue
+        try:
+            result = validate(data)
+        except RuntimeError as exc:
+            # schema 读不到属仓库损坏，不是数据问题：报出来而不是逐份示例重复报
+            problems.append(str(exc))
+            break
+
+        if expect_valid and not result.ok:
+            problems.append(f"{rel(f)}: 期望合法却被拒绝 -> {result.violations[0].describe()}")
+        elif not expect_valid:
+            if result.ok:
+                problems.append(f"{rel(f)}: 期望非法却通过了校验（校验器在放水）")
+            elif not any(v.path for v in result.violations):
+                problems.append(f"{rel(f)}: 被拒绝但未指出出错字段路径")
     return problems
 
 
