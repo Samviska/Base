@@ -27,6 +27,7 @@ renderer.setData(payload)        // 整体替换：payload 就是 M6 query_range
 renderer.appendData(chunk)       // 追加同名序列的数据（实时推送将来走这里）
 renderer.setViewport({ x0, x1 }) // 数据坐标
 renderer.setAnnotations(list)
+renderer.setCursors(list)        // 测量光标：[{ id, series, x }]
 renderer.resetView()             // 重置视图：纵轴回自动适应、横轴回数据完整范围
 renderer.on(event, handler)      // 返回取消订阅函数
 ```
@@ -37,6 +38,20 @@ renderer.on(event, handler)      // 返回取消订阅函数
 | `pan` | `{ x0, x1 }` | 拖拽平移后的视口 |
 | `hover` | `{ x, pixel }` | 鼠标位置的数据坐标；**无人订阅时不算** |
 | `mark-add` / `mark-remove` | — | 第 6 批（标注） |
+| `cursor-move` | `{ id, x, y, ymin, ymax, series, aggregated }` | 拖动光标后，**吸附到最近数据点**的结果 |
+
+### 3.3 测量光标
+
+| 项 | 约定 |
+| --- | --- |
+| 创建 / 删除 | 由 UI 决定（`setCursors()` 全量同步）；渲染器只管画与拖 |
+| 拖动 | 在光标线附近 6px 内按下即抓住它；拖动时**吸附到最近的数据点** |
+| 数值来源 | 渲染器吸附后经 `cursor-move` 给出，界面只负责显示——**同一套吸附不实现两遍** |
+| 聚合模式 | 吸附到的是**像素列**：`aggregated` 为真时界面必须说明「Y 是该列极值，不是原始采样点」 |
+| 视口外的光标 | 不绘制，也不参与命中测试 |
+
+> 为什么不做成"点一下画布就落一个光标"：那会与拖拽平移打架，
+> 也会与双击复位冲突。现在是**显式添加 + 拖动**，意图明确、互不干扰。
 
 `options.axes`：序列名 → 轴描述（[contract.md](../contract.md) §4.2），
 渲染器据此判断轴类型是否认识，**不认识就降级绘制并在画布上标注**——不崩、不静默。

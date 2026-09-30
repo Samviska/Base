@@ -8,7 +8,10 @@
 // Canvas 不是响应式的：任何数据或视口变化都必须显式重绘（本文件统一走 requestDraw）。
 
 const COLORS = ['#1e88e5', '#e53935', '#43a047', '#fb8c00', '#8e24aa', '#00acc1']
-const MARGIN = { left: 60, right: 16, top: 14, bottom: 44 }
+const CURSOR_COLOR = '#d81b60'
+// 绘图区边距：导出给内测脚本用——它要精确点在光标线上，靠猜坐标会点偏
+export const LAYOUT = { left: 60, right: 16, top: 14, bottom: 44 }
+const MARGIN = LAYOUT
 const TICKS = 4 // 每条轴的刻度段数
 
 // 核心认识的四类轴；其余按数值轴降级显示并标注（contract.md §4.2）
@@ -16,6 +19,8 @@ const KNOWN_KINDS = new Set(['numeric', 'sequence', 'time', 'categorical'])
 const MIN_SPAN = 1e-9 // 视口最小跨度：缩到 0 宽会让坐标换算除零
 
 export { assertRenderer } from '../interface.js'
+
+import { snapToSeries } from '../cursor.js'
 
 export function createRenderer({ container, options = {} }) {
   const axes = options.axes || {}
@@ -40,6 +45,7 @@ export function createRenderer({ container, options = {} }) {
     viewport: null,
     yView: null, // 手动缩放后的纵轴范围；null = 自动适应可见数据
     annotations: [],
+    cursors: [], // [{ id, series, x }]：x 是数据坐标，y 由吸附得到
   }
 
   // ---------- 生命周期 ----------
@@ -130,6 +136,11 @@ export function createRenderer({ container, options = {} }) {
     requestDraw()
   }
 
+  function setCursors(list) {
+    state.cursors = Array.isArray(list) ? list.map((item) => ({ ...item })) : []
+    requestDraw()
+  }
+
   function on(event, handler) {
     if (!handlers.has(event)) handlers.set(event, new Set())
     handlers.get(event).add(handler)
@@ -198,13 +209,23 @@ export function createRenderer({ container, options = {} }) {
   function onPointerDown(event) {
     const view = state.viewport
     if (!view) return
-    // 记下按下时在哪条轴上：轴带上拖拽平移该轴，绘图区内拖拽平移横轴
-    drag = {
-      zone: zoneAt(event.offsetX, event.offsetY, plotRect()),
-      pixel: event.offsetX,
-      pixelY: event.offsetY,
-      view: { ...view },
-      range: paintRange(),
+    const rect = plotRect()
+
+    // 光标线优先命中：它很细，命中范围给 6px——比"平移"更该被选中
+    const hit = state.cursors.find(
+      (cursor) => Math.abs(toPixelX(cursor.x, rect, view) - event.offsetX) <= 6,
+    )
+    if (hit) {
+      drag = { zone: 'cursor', id: hit.id }
+    } else {
+      // 记下按下时在哪条轴上：轴带上拖拽平移该轴，绘图区内拖拽平移横轴
+      drag = {
+        zone: zoneAt(event.offsetX, event.offsetY, rect),
+        pixel: event.offsetX,
+        pixelY: event.offsetY,
+        view: { ...view },
+        range: paintRange(),
+      }
     }
     canvas.setPointerCapture(event.pointerId)
   }
@@ -212,10 +233,18 @@ export function createRenderer({ container, options = {} }) {
   function onPointerMove(event) {
     const rect = plotRect()
     const zone = state.viewport ? zoneAt(event.offsetX, event.offsetY, rect) : 'plot'
-    // 光标就是"这里能缩放/拖拽哪条轴"的提示，不用额外解释
-    canvas.style.cursor = cursorFor(zone, Boolean(drag))
+    const overCursor = state.viewport
+      ? state.cursors.some(
+          (cursor) => Math.abs(toPixelX(cursor.x, rect, state.viewport) - event.offsetX) <= 6,
+        )
+      : false
+    canvas.style.cursor = drag ? 'grabbing' : overCursor ? 'col-resize' : cursorFor(zone, false)
 
     if (drag) {
+      if (drag.zone === 'cursor') {
+        moveCursor(drag.id, toDataX(event.offsetX, rect, state.viewport))
+        return
+      }
       if (drag.zone === 'y') {
         // 纵轴带上拖拽 = 平移纵轴（与在纵轴带上滚轮缩放配对）
         const shift = ((event.offsetY - drag.pixelY) / rect.height) * (drag.range.hi - drag.range.lo)
@@ -238,6 +267,18 @@ export function createRenderer({ container, options = {} }) {
     if (zone === 'y') return 'ns-resize'
     if (zone === 'x') return 'ew-resize'
     return 'crosshair'
+  }
+
+  // 拖动光标：吸附到最近的数据点，并把吸附结果报给界面
+  function moveCursor(id, x) {
+    const cursor = state.cursors.find((item) => item.id === id)
+    if (!cursor) return
+    const snap = snapToSeries(state.series, cursor.series, x)
+    if (!snap) return
+    cursor.x = snap.x
+    cursor.series = snap.series
+    emit('cursor-move', { id, ...snap })
+    requestDraw()
   }
 
   function onPointerUp(event) {
@@ -294,6 +335,7 @@ export function createRenderer({ container, options = {} }) {
 
     for (const series of state.series) drawSeries(series, rect, view, range)
     for (const annotation of state.annotations) drawAnnotation(annotation, rect, view)
+    drawCursors(rect, view, range)
     drawNotices()
     drawZoomHint()
   }
@@ -434,6 +476,38 @@ export function createRenderer({ container, options = {} }) {
     ctx.setLineDash([])
   }
 
+  // 测量光标：竖线 + 编号标签 + 与数据线的交点。
+  // 交点吸附到最近的数据点；聚合模式下它就是该像素列的极值——
+  // 界面会把这一点标出来，不让人误以为是原始采样值。
+  function drawCursors(rect, view, range) {
+    for (const [index, cursor] of state.cursors.entries()) {
+      const snap = snapToSeries(state.series, cursor.series, cursor.x)
+      if (!snap || !inView(snap.x, view)) continue
+      const px = toPixelX(snap.x, rect, view)
+
+      ctx.strokeStyle = CURSOR_COLOR
+      ctx.lineWidth = 1
+      ctx.setLineDash([3, 3])
+      ctx.beginPath()
+      ctx.moveTo(px, rect.top)
+      ctx.lineTo(px, rect.top + rect.height)
+      ctx.stroke()
+      ctx.setLineDash([])
+
+      ctx.fillStyle = CURSOR_COLOR
+      ctx.fillRect(px - 9, rect.top, 18, 15)
+      ctx.fillStyle = '#ffffff'
+      ctx.font = '11px system-ui, sans-serif'
+      ctx.textAlign = 'center'
+      ctx.fillText(cursor.label || `C${index + 1}`, px, rect.top + 11)
+
+      ctx.fillStyle = CURSOR_COLOR
+      ctx.beginPath()
+      ctx.arc(px, toPixelY(snap.y, rect, range), 3, 0, Math.PI * 2)
+      ctx.fill()
+    }
+  }
+
   function drawNotices() {
     const notices = collectNotices()
     // 从 22 起步：左上角那一行留给纵轴单位
@@ -509,6 +583,7 @@ export function createRenderer({ container, options = {} }) {
     appendData,
     setViewport,
     setAnnotations,
+    setCursors,
     resetView,
     on,
   }

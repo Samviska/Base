@@ -33,6 +33,8 @@ function fakeContext(record) {
     },
     stroke() {},
     fillText() {},
+    arc() {},
+    fill() {},
     setTransform() {},
     setLineDash() {},
     measureText: (text) => ({ width: String(text).length * 6 }),
@@ -340,6 +342,38 @@ test('resetView 方法可直接调用（界面上的「全览」按钮走它）'
   renderer.resetView()
 
   assert.deepEqual(zooms, [{ x0: 0, x1: 2 }], 'resetView 没有回到完整范围')
+})
+
+test('拖动光标：吸附到最近的数据点并报出数值', () => {
+  const { dom, renderer } = mounted() // 数据 x=[0,1,2]、y=[0,10,20]
+  renderer.setCursors([{ id: 'c1', series: 's', x: 1 }])
+  dom.flush()
+
+  const moves = []
+  renderer.on('cursor-move', (payload) => moves.push(payload))
+
+  // 绘图区宽度 724、左边界 60：x=1 落在约 422 像素处
+  dom.listeners.get('pointerdown')({ offsetX: 422, offsetY: 200, pointerId: 1 })
+  dom.listeners.get('pointermove')({ offsetX: 700, offsetY: 200, pointerId: 1 })
+  dom.listeners.get('pointerup')({ offsetX: 700, offsetY: 200, pointerId: 1 })
+
+  assert.equal(moves.length, 1, '拖动光标没有报出 cursor-move')
+  assert.equal(moves[0].id, 'c1')
+  assert.equal(moves[0].x, 2, '应该吸附到最靠右的那个数据点')
+  assert.equal(moves[0].y, 20)
+  assert.equal(moves[0].aggregated, false)
+})
+
+test('光标在视口外时不画，也不影响其它交互', () => {
+  const { dom, renderer } = mounted()
+  renderer.setCursors([{ id: 'c1', series: 's', x: 999 }]) // 远在视口 [0,2] 之外
+  dom.flush()
+
+  const zooms = []
+  renderer.on('zoom', (view) => zooms.push(view))
+  dom.listeners.get('wheel')(wheel())
+
+  assert.equal(zooms.length, 1, '视口外的光标不该挡住滚轮')
 })
 
 test('已经在全览且纵轴自动时，双击不做事', () => {

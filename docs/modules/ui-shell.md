@@ -43,6 +43,7 @@
 | 坏插件警告 | M2 的 `warnings` 字段 |
 | 序列勾选列表与单位 | M3 摘要的 `series[]` |
 | **数据总量 / 本次绘制点数** | 前者来自 M3 摘要，后者来自 M6 响应——**两者必须分开显示**，否则聚合时使用者会以为数据丢了 |
+| 右侧光标面板 | [CursorPanel](../../frontend/ui/components/CursorPanel.vue)：各光标的 X/Y 与相邻差值；数值来自渲染器的 `cursor-move` 事件 |
 | 文件浏览弹窗 | M18 `browse`：浏览器拿不到本机路径，列目录只能由后端提供 |
 | 横轴标题、刻度格式、纵轴单位 | M3 摘要的 `axis` 与 `unit`，交给[渲染器](renderer.md)显示 |
 

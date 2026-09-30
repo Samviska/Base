@@ -17,6 +17,8 @@ import { fileURLToPath } from 'node:url'
 
 import { chromium } from 'playwright'
 
+import { LAYOUT } from '../renderers/builtin/line.js'
+
 const HERE = dirname(fileURLToPath(import.meta.url))
 const FRONTEND = resolve(HERE, '..')
 const ROOT = resolve(FRONTEND, '..')
@@ -99,8 +101,22 @@ async function waitFor(predicate, timeout = 15000, interval = 120) {
   }
 }
 
+// Vite 的 HMR 可能在内测过程中重载页面（组件重挂载 → 状态清零），
+// 每段操作开始前都确认插件下拉已就绪，避免把"环境抖动"误报成功能问题
+function pluginsReady(page) {
+  return waitFor(async () => (await page.getByTestId('source-plugin').locator('option').count()) >= 2)
+}
+
 function near(a, b, tolerance = 1e-6) {
   return Math.abs(a - b) <= tolerance * Math.max(1, Math.abs(a), Math.abs(b))
+}
+
+// 绘图区里某个横向比例对应的屏幕 x。边距取自渲染器导出的 LAYOUT——
+// 靠猜坐标会点偏，结果"没抓住光标线"却看着像拖成功了
+function plotX(box, ratio) {
+  const left = box.x + LAYOUT.left
+  const width = box.width - LAYOUT.left - LAYOUT.right
+  return left + width * ratio
 }
 
 // ---------- 主流程 ----------
@@ -113,6 +129,9 @@ async function main() {
 
   const browser = await chromium.launch({ channel: 'msedge' })
   const page = await browser.newPage({ viewport: { width: 1280, height: 820 } })
+  // dev server 刚重启时首次加载要重新预构建依赖，默认 30s 可能不够
+  page.setDefaultTimeout(60000)
+  page.setDefaultNavigationTimeout(60000)
 
   // 页面上任何未捕获异常与控制台错误都要算失败：静默失效正是之前踩过的坑
   page.on('pageerror', (error) => {
@@ -133,6 +152,7 @@ async function main() {
   })
   const connected = await waitFor(async () => (await text(page, 'status-connection')).includes('已连接'))
   check(connected, '页面连上后端')
+  check(await pluginsReady(page), '插件下拉已就绪')
   const options = await page.getByTestId('source-plugin').locator('option').allInnerTexts()
   check(options.some((item) => item.includes('JP18')), `插件下拉里有 JP18（实际：${options.join(' / ')}`)
 
@@ -229,6 +249,7 @@ async function main() {
 
   console.log('\n【9】勾掉曲线 = 图上少一条')
   const folder = resolve(ROOT, 'contract', 'examples', 'example-basic.json')
+  check(await pluginsReady(page), '插件下拉仍可用')
   await page.getByTestId('source-plugin').selectOption('contract-json')
   await page.getByTestId('file-path').fill(folder)
   await page.getByTestId('open-file').click()
@@ -237,7 +258,50 @@ async function main() {
   await page.getByTestId('series-温度').uncheck()
   await page.waitForTimeout(400)
   check((await drawPoints(page)) === 4, `取消「温度」后只剩 4 点（实际 ${await drawPoints(page)}）`)
-  await page.screenshot({ path: resolve(LOCAL, 'e2e-05-曲线勾选.png') })
+
+  console.log('\n【10】光标：添加两个、拖动、读差值')
+  // 回到大日志上做，两个光标才有明显的 ΔX / ΔY
+  check(await pluginsReady(page), '插件下拉仍可用')
+  await page.getByTestId('source-plugin').selectOption('jp18-ecg')
+  await page.getByTestId('file-path').fill(logPath)
+  await page.getByTestId('open-file').click()
+  await waitFor(async () => (await dataPoints(page)) === SAMPLE_COUNT, 8000)
+
+  await page.getByTestId('cursor-add').click()
+  await page.getByTestId('cursor-add').click()
+  const listShown = await waitFor(async () => (await page.getByTestId('cursor-list').count()) === 1, 5000)
+  check(listShown, '右侧面板列出了光标')
+  check((await page.getByTestId('delta-0').count()) === 1, '两个光标之间显示出差值')
+
+  const before = await page.getByTestId('cursor-1').innerText()
+  const boxNow = await page.getByTestId('chart').boundingBox()
+  const viewBefore = await viewport(page)
+
+  // 抓住第二个光标（默认落在视口的 50% 处），拖到 80% 处
+  const grabY = boxNow.y + boxNow.height * 0.5
+  await page.mouse.move(plotX(boxNow, 0.5), grabY)
+  await page.mouse.down()
+  await page.mouse.move(plotX(boxNow, 0.8), grabY, { steps: 10 })
+  await page.mouse.up()
+  await page.waitForTimeout(300)
+
+  const after = await page.getByTestId('cursor-1').innerText()
+  const viewAfter = await viewport(page)
+
+  // 这一条是关键：拖光标**不能**平移画布，否则说明没抓住线（曾经就是这样假通过的）
+  check(
+    near(viewBefore[0], viewAfter[0], 1e-6) && near(viewBefore[1], viewAfter[1], 1e-6),
+    '拖动光标没有平移画布（确实抓住了线）',
+  )
+  check(before !== after, `拖动后读数变了（${before.replace(/\s+/g, ' ')} → ${after.replace(/\s+/g, ' ')}）`)
+  const deltaText = await page.getByTestId('delta-0').innerText()
+  check(/ΔX/.test(deltaText) && /ΔY/.test(deltaText), `差值给出 ΔX 与 ΔY：${deltaText.replace(/\s+/g, ' ')}`)
+  check(!/ΔX 0\.00.*ΔY 0\.00/.test(deltaText.replace(/\s+/g, ' ')), '两个光标不重叠，差值不是全 0')
+  await page.screenshot({ path: resolve(LOCAL, 'e2e-06-光标.png') })
+
+  console.log('\n【11】聚合显示时明确标出"取的是像素列极值"')
+  const note = await page.getByTestId('cursor-aggregated-note').count()
+  check(note === 1, '聚合模式下给出了"不是原始采样点"的说明')
 
   await browser.close()
 }

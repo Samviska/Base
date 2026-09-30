@@ -3,7 +3,9 @@ import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 
 import { CLIENT_STATE, createClient } from '../api/client.js'
 import { createViewportLoader } from '../api/viewport-loader.js'
+import { snapToSeries } from '../renderers/cursor.js'
 import ChartView from './components/ChartView.vue'
+import CursorPanel from './components/CursorPanel.vue'
 import FileBrowser from './components/FileBrowser.vue'
 import FilePanel from './components/FilePanel.vue'
 import StatusBar from './components/StatusBar.vue'
@@ -34,6 +36,10 @@ const busy = ref(false)
 const datasetId = ref(0)
 const browserOpen = ref(false)
 const chart = ref(null)
+const drawData = ref(null) // 当前绘制数据：光标取值要从这里吸附
+const cursors = ref([]) // [{ id, series, x }]，x 是数据坐标
+const cursorReadings = ref([]) // 吸附后的读数，给右侧面板显示
+let cursorSeq = 0
 
 // 所有数据请求都从这里出去：按帧节流 + 代次作废，缩放时不会打出请求风暴
 const loader = createViewportLoader({
@@ -41,6 +47,8 @@ const loader = createViewportLoader({
   onData: (payload) => {
     aggregated.value = payload.aggregated
     drawPoints.value = payload.series.reduce((sum, item) => sum + item.x.length, 0)
+    drawData.value = payload
+    refreshReadings()
     chart.value?.applyData(payload)
   },
   onError: showError,
@@ -115,6 +123,9 @@ async function openFile() {
     selected.value = summary.series.map((item) => item.name)
     aggregated.value = false
     drawPoints.value = 0
+    // 换了数据，旧光标的 x 未必还有意义，直接清空
+    cursors.value = []
+    cursorReadings.value = []
     dataPoints.value = summary.series.reduce((sum, item) => sum + (item.point_count || 0), 0)
 
     // 顺序要紧：渲染器在 mount 时读取 fullRange，先重建再赋值它就只能读到旧值
@@ -139,6 +150,39 @@ function onSelectionChange(next) {
 // 与"双击画布"同一个动作：渲染器会自己发 zoom 回到完整范围
 function resetView() {
   chart.value?.resetView()
+}
+
+// 光标默认落在视口里；之后拖动竖线即可移动
+function addCursor() {
+  const series = selected.value[0] || drawData.value?.series?.[0]?.name
+  if (!series || !viewport.value) return
+  cursorSeq += 1
+  // 依次错开：两个光标叠在一起时差值恒为 0，等于没给信息
+  const ratio = Math.min(0.3 + 0.2 * cursors.value.length, 0.9)
+  const x = viewport.value.x0 + (viewport.value.x1 - viewport.value.x0) * ratio
+  cursors.value = [...cursors.value, { id: `c${cursorSeq}`, series, x }]
+  refreshReadings()
+}
+
+function removeCursor(id) {
+  cursors.value = cursors.value.filter((item) => item.id !== id)
+  refreshReadings()
+}
+
+function onCursorMove(payload) {
+  cursors.value = cursors.value.map((item) =>
+    item.id === payload.id ? { ...item, x: payload.x, series: payload.series } : item,
+  )
+  refreshReadings()
+}
+
+// 吸附规则只实现一处（renderers/cursor.js）：渲染器画交点用它，这里算读数也用它
+function refreshReadings() {
+  const seriesList = drawData.value?.series || []
+  cursorReadings.value = cursors.value.map((cursor) => {
+    const snap = snapToSeries(seriesList, cursor.series, cursor.x)
+    return snap ? { id: cursor.id, ...snap } : { id: cursor.id, x: cursor.x, y: null }
+  })
 }
 
 onMounted(() => {
@@ -200,15 +244,20 @@ onBeforeUnmount(() => {
     />
 
     <main class="stage">
-      <ChartView
-        :key="datasetId"
-        ref="chart"
-        :axes="axes"
-        :units="units"
-        :full-range="fullRange"
-        @zoom="applyViewport"
-        @pan="applyViewport"
-      />
+      <div class="chart-box">
+        <ChartView
+          :key="datasetId"
+          ref="chart"
+          :axes="axes"
+          :units="units"
+          :full-range="fullRange"
+          :cursors="cursors"
+          @zoom="applyViewport"
+          @pan="applyViewport"
+          @cursor-move="onCursorMove"
+        />
+      </div>
+      <CursorPanel :readings="cursorReadings" @add="addCursor" @remove="removeCursor" />
     </main>
 
     <StatusBar
@@ -263,6 +312,13 @@ h1 {
 }
 
 .stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: var(--gap);
+  min-height: 0;
+}
+
+.chart-box {
   min-height: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius);

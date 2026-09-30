@@ -22,6 +22,15 @@ export const strings = {
   seriesHint: '勾选要显示的曲线（一条曲线 = 数据里的一组 x/y）',
   noSeries: '尚未打开数据',
 
+  cursor: {
+    title: '光标',
+    add: '添加光标',
+    remove: '删除该光标',
+    empty: '点 ＋ 添加光标；拖动画布上的竖线可以移动它',
+    delta: '差值',
+    aggregatedNote: '※ 当前是聚合显示：光标对齐到像素列，Y 是该列的极值，不是原始采样点',
+  },
+
   browser: {
     title: '选择日志文件',
     parent: '上一级',

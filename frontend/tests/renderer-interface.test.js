@@ -43,7 +43,7 @@ test('事件订阅返回可用的取消函数', () => {
 })
 
 test('事件类型清单是接口的一部分', () => {
-  assert.deepEqual(VIEW_EVENTS, ['zoom', 'pan', 'mark-add', 'mark-remove', 'hover'])
+  assert.deepEqual(VIEW_EVENTS, ['zoom', 'pan', 'mark-add', 'mark-remove', 'hover', 'cursor-move'])
 })
 
 test('缩放以鼠标位置为锚点，缩到极限时返回 null', () => {

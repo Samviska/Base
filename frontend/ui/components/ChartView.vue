@@ -1,5 +1,5 @@
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 import { createRenderer } from '../../renderers/builtin/line.js'
 
@@ -8,8 +8,9 @@ const props = defineProps({
   units: { type: Object, default: () => ({}) },
   // 数据完整范围（来自 M3 摘要）：渲染器靠它实现"双击回到全览"
   fullRange: { type: Array, default: null },
+  cursors: { type: Array, default: () => [] },
 })
-const emit = defineEmits(['zoom', 'pan'])
+const emit = defineEmits(['zoom', 'pan', 'cursorMove'])
 
 const host = ref(null)
 let renderer = null
@@ -21,9 +22,18 @@ onMounted(() => {
     options: { axes: props.axes, units: props.units, fullRange: props.fullRange },
   })
   renderer.mount()
+  renderer.setCursors(props.cursors)
   renderer.on('zoom', (view) => emit('zoom', view))
   renderer.on('pan', (view) => emit('pan', view))
+  renderer.on('cursor-move', (payload) => emit('cursorMove', payload))
 })
+
+// 新增 / 删除光标由上层决定，这里只同步下去
+watch(
+  () => props.cursors,
+  (list) => renderer?.setCursors(list),
+  { deep: true },
+)
 
 onBeforeUnmount(() => {
   renderer?.unmount()
