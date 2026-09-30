@@ -30,6 +30,10 @@ export function createRenderer({ container, options = {} }) {
   let cssWidth = 0
   let cssHeight = 0
 
+  // 数据完整范围（来自 M3 摘要的 x_range）：双击"回到全览"要用它。
+  // 渲染器拿不到全量数据，所以这个范围只能由上层传进来。
+  const fullRange = Array.isArray(options.fullRange) ? options.fullRange : null
+
   const state = {
     series: [],
     aggregated: false,
@@ -62,7 +66,8 @@ export function createRenderer({ container, options = {} }) {
     canvas.addEventListener('pointermove', onPointerMove)
     canvas.addEventListener('pointerup', onPointerUp)
     canvas.addEventListener('pointercancel', onPointerUp)
-    canvas.addEventListener('pointerleave', onPointerLeave)
+    // 不监听 pointerleave：指针捕获已经在工作，拖出画布不该中断这次拖拽——
+    // 以前那次"拖拽突然没了"就是这么来的（拖快一点，指针出了边界）
 
     resize()
     requestDraw()
@@ -80,7 +85,6 @@ export function createRenderer({ container, options = {} }) {
       canvas.removeEventListener('pointermove', onPointerMove)
       canvas.removeEventListener('pointerup', onPointerUp)
       canvas.removeEventListener('pointercancel', onPointerUp)
-      canvas.removeEventListener('pointerleave', onPointerLeave)
       canvas.remove()
     }
     canvas = null
@@ -175,25 +179,46 @@ export function createRenderer({ container, options = {} }) {
   }
 
   function onDoubleClick() {
-    // 手动缩放过纵轴之后总得有条退路：双击恢复自动适应
-    if (!state.yView) return
+    // 双击 = 重置视图。**不要求"先手动缩放过纵轴"**：滚动、拖拽之后都该能一键回全览，
+    // 否则想看全局却发现回不去，只能靠刷新页面。
+    const view = state.viewport
+    const yIsAuto = state.yView === null
+    const xIsFull = !fullRange || !view || (view.x0 === fullRange[0] && view.x1 === fullRange[1])
+    if (yIsAuto && xIsFull) return
+
     state.yView = null
+    if (!xIsFull && fullRange) emit('zoom', { x0: fullRange[0], x1: fullRange[1] })
     requestDraw()
   }
 
   function onPointerDown(event) {
-    if (!state.viewport) return
-    drag = { pixel: event.offsetX, view: { ...state.viewport } }
+    const view = state.viewport
+    if (!view) return
+    // 记下按下时在哪条轴上：轴带上拖拽平移该轴，绘图区内拖拽平移横轴
+    drag = {
+      zone: zoneAt(event.offsetX, event.offsetY, plotRect()),
+      pixel: event.offsetX,
+      pixelY: event.offsetY,
+      view: { ...view },
+      range: paintRange(),
+    }
     canvas.setPointerCapture(event.pointerId)
   }
 
   function onPointerMove(event) {
     const rect = plotRect()
     const zone = state.viewport ? zoneAt(event.offsetX, event.offsetY, rect) : 'plot'
-    // 光标就是"这里能缩放哪条轴"的提示，不用额外解释
-    canvas.style.cursor = zone === 'y' ? 'ns-resize' : zone === 'x' ? 'ew-resize' : 'crosshair'
+    // 光标就是"这里能缩放/拖拽哪条轴"的提示，不用额外解释
+    canvas.style.cursor = cursorFor(zone, Boolean(drag))
 
     if (drag) {
+      if (drag.zone === 'y') {
+        // 纵轴带上拖拽 = 平移纵轴（与在纵轴带上滚轮缩放配对）
+        const shift = ((event.offsetY - drag.pixelY) / rect.height) * (drag.range.hi - drag.range.lo)
+        state.yView = { lo: drag.range.lo + shift, hi: drag.range.hi + shift }
+        requestDraw()
+        return
+      }
       const shift = ((event.offsetX - drag.pixel) / rect.width) * (drag.view.x1 - drag.view.x0)
       emit('pan', { x0: drag.view.x0 - shift, x1: drag.view.x1 - shift })
       return
@@ -204,14 +229,17 @@ export function createRenderer({ container, options = {} }) {
     }
   }
 
+  function cursorFor(zone, dragging) {
+    if (dragging) return 'grabbing'
+    if (zone === 'y') return 'ns-resize'
+    if (zone === 'x') return 'ew-resize'
+    return 'crosshair'
+  }
+
   function onPointerUp(event) {
     if (!drag) return
     drag = null
     if (canvas.hasPointerCapture?.(event.pointerId)) canvas.releasePointerCapture(event.pointerId)
-  }
-
-  function onPointerLeave() {
-    drag = null
   }
 
   // ---------- 绘制 ----------

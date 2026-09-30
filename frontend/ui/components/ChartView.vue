@@ -6,6 +6,8 @@ import { createRenderer } from '../../renderers/builtin/line.js'
 const props = defineProps({
   axes: { type: Object, default: () => ({}) },
   units: { type: Object, default: () => ({}) },
+  // 数据完整范围（来自 M3 摘要）：渲染器靠它实现"双击回到全览"
+  fullRange: { type: Array, default: null },
 })
 const emit = defineEmits(['zoom', 'pan'])
 
@@ -16,7 +18,7 @@ onMounted(() => {
   // UI 只把容器交出去：渲染器内部不引用 Vue，两者之间只有数据与事件（renderer.md 硬规则 1）
   renderer = createRenderer({
     container: host.value,
-    options: { axes: props.axes, units: props.units },
+    options: { axes: props.axes, units: props.units, fullRange: props.fullRange },
   })
   renderer.mount()
   renderer.on('zoom', (view) => emit('zoom', view))

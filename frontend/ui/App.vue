@@ -24,6 +24,7 @@ const seriesList = ref([])
 const selected = ref([])
 const axes = ref({})
 const units = ref({})
+const fullRange = ref(null)
 const viewport = ref(null)
 const aggregated = ref(false)
 const points = ref(0)
@@ -119,6 +120,8 @@ async function openFile() {
     await nextTick()
 
     const axisRange = summary.series[0]?.x_range
+    // 双击"回到全览"要用到完整范围，而前端除了这个摘要拿不到别的
+    fullRange.value = axisRange || null
     applyViewport(axisRange ? { x0: axisRange[0], x1: axisRange[1] } : { x0: 0, x1: 1 })
   } catch (error) {
     showError(error)
@@ -193,6 +196,7 @@ onBeforeUnmount(() => {
         ref="chart"
         :axes="axes"
         :units="units"
+        :full-range="fullRange"
         @zoom="applyViewport"
         @pan="applyViewport"
       />

@@ -107,11 +107,20 @@ function wheelDown(overrides = {}) {
 // 必须按颜色筛掉网格线——网格竖线正好是整幅绘图区的高度，会把效果完全淹没。
 const SERIES_COLOR = '#1e88e5'
 
-function paintedSpanY(record) {
-  const ys = record
+function dataYs(record) {
+  return record
     .filter(([kind, , , color]) => kind === 'line' && color === SERIES_COLOR)
     .map(([, , y]) => y)
+}
+
+function paintedSpanY(record) {
+  const ys = dataYs(record)
   return ys.length ? Math.max(...ys) - Math.min(...ys) : 0
+}
+
+function paintedCenterY(record) {
+  const ys = dataYs(record)
+  return ys.length ? (Math.max(...ys) + Math.min(...ys)) / 2 : 0
 }
 
 function mounted() {
@@ -235,4 +244,98 @@ test('缩到极限不再发出 zoom 事件', () => {
 
   assert.ok(zooms.length > 0)
   assert.ok(last.x1 > last.x0, '视口跨度不能变成 0 或负数')
+})
+
+test('绘图区拖拽平移横轴', () => {
+  const { dom, renderer } = mounted()
+  const pans = []
+  renderer.on('pan', (view) => pans.push(view))
+
+  dom.listeners.get('pointerdown')({ offsetX: 400, offsetY: 200, pointerId: 1 })
+  dom.listeners.get('pointermove')({ offsetX: 460, offsetY: 200, pointerId: 1 })
+
+  assert.equal(pans.length, 1, '拖拽没有产生 pan 事件')
+  assert.ok(pans[0].x0 < 0, `向右拖拽应让视口左移：${JSON.stringify(pans[0])}`)
+})
+
+test('拖出画布不中断拖拽', () => {
+  // 以前这里挂了 pointerleave，指针一离开画布就把拖拽清掉——拖快一点就"拖不动了"
+  const { dom, renderer } = mounted()
+  const pans = []
+  renderer.on('pan', (view) => pans.push(view))
+
+  dom.listeners.get('pointerdown')({ offsetX: 400, offsetY: 200, pointerId: 1 })
+  dom.listeners.get('pointermove')({ offsetX: 460, offsetY: 200, pointerId: 1 })
+  dom.listeners.get('pointermove')({ offsetX: 900, offsetY: 600, pointerId: 1 })
+
+  assert.equal(pans.length, 2, '指针移出画布后拖拽被中断了')
+})
+
+test('纵轴带上拖拽平移纵轴：跨度不变、位置移动', () => {
+  const { dom } = mounted()
+  const before = paintedCenterY(dom.record)
+  const span = paintedSpanY(dom.record)
+  const drawn = dataYs(dom.record).length
+
+  dom.listeners.get('pointerdown')({ offsetX: 20, offsetY: 200, pointerId: 1 })
+  dom.listeners.get('pointermove')({ offsetX: 20, offsetY: 240, pointerId: 1 })
+  dom.flush()
+
+  const moved = paintedSpanY(dom.record)
+  // 平移不改跨度，但像素换算会带来 1e-14 级的浮点误差
+  assert.ok(
+    Math.abs(moved - span) < 1e-9,
+    `平移不该改变跨度：${span}（${drawn} 点）-> ${moved}（${dataYs(dom.record).length} 点）`,
+  )
+  assert.ok(paintedCenterY(dom.record) > before, '向下拖拽应让图形下移')
+})
+
+test('双击重置：只拖拽过横轴也能一键回全览', () => {
+  const dom = setupDom()
+  const renderer = createRenderer({ container: dom.container, options: { fullRange: [0, 2] } })
+  renderer.mount()
+  renderer.setData({
+    aggregated: false,
+    series: [{ name: 's', x: [0, 1, 2], ymin: [0, 10, 20], ymax: [0, 10, 20] }],
+  })
+  renderer.setViewport({ x0: 0, x1: 2 })
+  dom.flush()
+
+  const pans = []
+  // 模拟 App 的行为：收到 pan 就更新视口，否则渲染器仍以为自己在全览状态
+  renderer.on('pan', (view) => {
+    pans.push(view)
+    renderer.setViewport(view)
+  })
+  const zooms = []
+  renderer.on('zoom', (view) => zooms.push(view))
+
+  // 只拖拽横轴，不碰纵轴
+  dom.listeners.get('pointerdown')({ offsetX: 400, offsetY: 200, pointerId: 1 })
+  dom.listeners.get('pointermove')({ offsetX: 300, offsetY: 200, pointerId: 1 })
+  dom.listeners.get('pointerup')({ offsetX: 300, offsetY: 200, pointerId: 1 })
+  dom.flush()
+  assert.equal(pans.length, 1, '前置条件：横轴已经平移过')
+
+  // 关键：这里**没有**手动缩放过纵轴，双击同样要生效
+  dom.listeners.get('dblclick')({})
+  assert.deepEqual(zooms, [{ x0: 0, x1: 2 }], '双击没有回到完整范围')
+})
+
+test('已经在全览且纵轴自动时，双击不做事', () => {
+  const dom = setupDom()
+  const renderer = createRenderer({ container: dom.container, options: { fullRange: [0, 2] } })
+  renderer.mount()
+  renderer.setData({
+    aggregated: false,
+    series: [{ name: 's', x: [0, 1, 2], ymin: [0, 10, 20], ymax: [0, 10, 20] }],
+  })
+  renderer.setViewport({ x0: 0, x1: 2 })
+  dom.flush()
+
+  const zooms = []
+  renderer.on('zoom', (view) => zooms.push(view))
+  dom.listeners.get('dblclick')({})
+
+  assert.deepEqual(zooms, [])
 })
