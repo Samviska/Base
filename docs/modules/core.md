@@ -12,6 +12,7 @@
 | --- | --- |
 | 会话状态与三层缓存 | `backend/core/session.py` |
 | 命令分发（消息 → 响应） | `backend/core/dispatch.py` |
+| 列目录（界面选文件用） | `backend/core/browse.py` |
 | 错误码与领域错误 | `backend/core/errors.py` |
 | 用例 | `backend/tests/test_core.py` |
 
@@ -34,7 +35,7 @@ response = handle(session, request_envelope)   # 同步函数：返回响应信�
 
 | 状态 | 消息 |
 | --- | --- |
-| 已实现 | `list_plugins`、`open_file`、`close_source`、`list_storage_formats`、`query_range`、`get_filter_chain`、`set_filter_chain` |
+| 已实现 | `list_plugins`、`browse`、`open_file`、`close_source`、`list_storage_formats`、`query_range`、`get_filter_chain`、`set_filter_chain` |
 | 未实现 | 标注四条（M9–M12）与会话两条（M13、M14）属第 6 批：回 `INTERNAL` 并说明尚未实现 |
 | 未登记类型 | 回 `UNKNOWN_TYPE` |
 
@@ -52,7 +53,14 @@ response = handle(session, request_envelope)   # 同步函数：返回响应信�
 聚合缓存**有上限**（32 条，超出淘汰最久未用的）：拖拽缩放会持续产生新键，不设上限就是内存泄漏。
 换文件时**保留滤波链配置**——换一个文件通常还想用同一套滤波。
 
-### 3.2 数据源插件的调用
+### 3.3 列目录
+
+`browse` 让界面能"按目录选文件"：浏览器拿不到本机路径，而 `open_file` 要的正是路径。
+它只列名字与大小、**不读内容**（读内容是数据源插件的事），并做了三件小事：
+传文件时退到所在目录、目录排在文件前、坏条目（权限/失效链接）跳过而不是整次失败。
+条目上限 2000 条，超出时响应里带 `truncated`。
+
+### 3.4 数据源插件的调用
 
 `open_file` 通过 `backend/sources` 的注册表调用插件：不指定 `source_plugin` 时用内置的
 `contract-json`（直接读契约 JSON），指定时按 id 查表。

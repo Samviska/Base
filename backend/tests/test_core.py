@@ -178,6 +178,38 @@ class QueryRangeTest(unittest.TestCase):
         self.assertEqual("INTERNAL", response["error"]["code"])
 
 
+class BrowseTest(unittest.TestCase):
+    """列目录：界面选文件靠它，因为浏览器给不出本机路径。"""
+
+    def test_lists_a_directory_with_entries(self):
+        payload = send(Session(), "browse", {"path": str(EXAMPLES.parent)})["payload"]
+        names = [entry["name"] for entry in payload["entries"]]
+        self.assertIn("examples", names)
+        self.assertEqual(str(EXAMPLES.parent), payload["path"])
+        self.assertTrue(payload["parent"])
+
+    def test_directories_come_first(self):
+        payload = send(Session(), "browse", {"path": str(EXAMPLES.parent)})["payload"]
+        types = [entry["type"] for entry in payload["entries"]]
+        self.assertEqual(sorted(types, key=lambda kind: kind != "dir"), types)
+
+    def test_file_path_falls_back_to_its_directory(self):
+        payload = send(Session(), "browse", {"path": str(EXAMPLES / "example-basic.json")})["payload"]
+        self.assertEqual(str(EXAMPLES), payload["path"])
+
+    def test_defaults_to_home_directory(self):
+        self.assertTrue(send(Session(), "browse")["payload"]["path"])
+
+    def test_files_carry_their_size(self):
+        payload = send(Session(), "browse", {"path": str(EXAMPLES)})["payload"]
+        files = [entry for entry in payload["entries"] if entry["type"] == "file"]
+        self.assertTrue(files)
+        self.assertTrue(all(isinstance(entry["size"], int) for entry in files))
+
+    def test_bad_path_type_is_invalid_request(self):
+        self.assertEqual("INVALID_REQUEST", send(Session(), "browse", {"path": 123})["error"]["code"])
+
+
 class PluginAndChainTest(unittest.TestCase):
     def test_list_plugins_reports_both_kinds(self):
         payload = send(Session(), "list_plugins")["payload"]

@@ -4,6 +4,7 @@ import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { CLIENT_STATE, createClient } from '../api/client.js'
 import { createViewportLoader } from '../api/viewport-loader.js'
 import ChartView from './components/ChartView.vue'
+import FileBrowser from './components/FileBrowser.vue'
 import FilePanel from './components/FilePanel.vue'
 import StatusBar from './components/StatusBar.vue'
 import { strings } from './strings.js'
@@ -29,6 +30,7 @@ const points = ref(0)
 const errorText = ref('')
 const busy = ref(false)
 const datasetId = ref(0)
+const browserOpen = ref(false)
 const chart = ref(null)
 
 // 所有数据请求都从这里出去：按帧节流 + 代次作废，缩放时不会打出请求风暴
@@ -173,7 +175,16 @@ onBeforeUnmount(() => {
       @update:pluginId="selectPlugin"
       @update:options="pluginOptions = $event"
       @update:selected="onSelectionChange"
+      @browse="browserOpen = true"
       @open="openFile"
+    />
+
+    <!-- 浏览器给不出本机路径，所以"浏览文件"走后端的列目录命令 -->
+    <FileBrowser
+      v-model="browserOpen"
+      :request="(type, payload) => client.request(type, payload)"
+      :initial-path="filePath"
+      @select="filePath = $event"
     />
 
     <main class="stage">

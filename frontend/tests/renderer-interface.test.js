@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { createRenderer, formatTick } from '../renderers/builtin/line.js'
+import { createRenderer, formatTick, zoomRange } from '../renderers/builtin/line.js'
 import { VIEW_EVENTS, assertRenderer } from '../renderers/interface.js'
 
 test('内置折线图满足渲染器接口约定', () => {
@@ -44,6 +44,15 @@ test('事件订阅返回可用的取消函数', () => {
 
 test('事件类型清单是接口的一部分', () => {
   assert.deepEqual(VIEW_EVENTS, ['zoom', 'pan', 'mark-add', 'mark-remove', 'hover'])
+})
+
+test('缩放以鼠标位置为锚点，缩到极限时返回 null', () => {
+  // 锚点 50 在缩放前后落在同一个数据位置，这样"指着哪就放大哪"
+  assert.deepEqual(zoomRange({ lo: 0, hi: 100 }, 0.5, 50), { lo: 25, hi: 75 })
+  assert.deepEqual(zoomRange({ lo: 25, hi: 75 }, 2, 50), { lo: 0, hi: 100 })
+  // 锚点在边缘时，另一侧被拉长
+  assert.deepEqual(zoomRange({ lo: 0, hi: 100 }, 0.5, 0), { lo: 0, hi: 50 })
+  assert.equal(zoomRange({ lo: 0, hi: 1 }, 1e-12, 0.5, 1e-9), null)
 })
 
 test('刻度按轴描述格式化：数据说自己是什么，就显示成什么', () => {

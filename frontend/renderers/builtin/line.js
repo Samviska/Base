@@ -34,6 +34,7 @@ export function createRenderer({ container, options = {} }) {
     series: [],
     aggregated: false,
     viewport: null,
+    yView: null, // 手动缩放后的纵轴范围；null = 自动适应可见数据
     annotations: [],
   }
 
@@ -56,6 +57,7 @@ export function createRenderer({ container, options = {} }) {
     observer.observe(container)
 
     canvas.addEventListener('wheel', onWheel, { passive: false })
+    canvas.addEventListener('dblclick', onDoubleClick)
     canvas.addEventListener('pointerdown', onPointerDown)
     canvas.addEventListener('pointermove', onPointerMove)
     canvas.addEventListener('pointerup', onPointerUp)
@@ -73,6 +75,7 @@ export function createRenderer({ container, options = {} }) {
     observer = null
     if (canvas) {
       canvas.removeEventListener('wheel', onWheel)
+      canvas.removeEventListener('dblclick', onDoubleClick)
       canvas.removeEventListener('pointerdown', onPointerDown)
       canvas.removeEventListener('pointermove', onPointerMove)
       canvas.removeEventListener('pointerup', onPointerUp)
@@ -141,12 +144,36 @@ export function createRenderer({ container, options = {} }) {
     event.preventDefault() // 否则整页跟着滚
 
     const rect = plotRect()
-    const anchor = toDataX(event.offsetX, rect, view)
     const factor = event.deltaY > 0 ? 1.15 : 1 / 1.15
-    const x0 = anchor - (anchor - view.x0) * factor
-    const x1 = anchor + (view.x1 - anchor) * factor
-    if (!(x1 - x0 > MIN_SPAN)) return
-    emit('zoom', { x0, x1 })
+    const zone = zoneAt(event.offsetX, event.offsetY, rect)
+
+    // 鼠标停在哪条轴上就缩放哪条：这是 TradingView / SciChart 一类软件的通行做法。
+    // 绘图区内默认缩放横轴（横轴决定要向后端请求哪段数据），Shift 时改缩放纵轴。
+    if (zone === 'y' || (zone === 'plot' && event.shiftKey)) {
+      const next = zoomRange(paintRange(), factor, toDataY(event.offsetY, rect, paintRange()), MIN_SPAN)
+      if (next) {
+        state.yView = next
+        requestDraw()
+      }
+      return
+    }
+
+    const next = zoomRange(view, factor, toDataX(event.offsetX, rect, view), MIN_SPAN)
+    if (next) emit('zoom', { x0: next.lo, x1: next.hi })
+  }
+
+  // 轴带：左侧留给纵轴，底部留给横轴。判断用 CSS 像素，与绘制时的边距一致
+  function zoneAt(px, py, rect) {
+    if (px < rect.left) return 'y'
+    if (py > rect.top + rect.height) return 'x'
+    return 'plot'
+  }
+
+  function onDoubleClick() {
+    // 手动缩放过纵轴之后总得有条退路：双击恢复自动适应
+    if (!state.yView) return
+    state.yView = null
+    requestDraw()
   }
 
   function onPointerDown(event) {
@@ -156,15 +183,19 @@ export function createRenderer({ container, options = {} }) {
   }
 
   function onPointerMove(event) {
+    const rect = plotRect()
+    const zone = state.viewport ? zoneAt(event.offsetX, event.offsetY, rect) : 'plot'
+    // 光标就是"这里能缩放哪条轴"的提示，不用额外解释
+    canvas.style.cursor = zone === 'y' ? 'ns-resize' : zone === 'x' ? 'ew-resize' : 'crosshair'
+
     if (drag) {
-      const rect = plotRect()
       const shift = ((event.offsetX - drag.pixel) / rect.width) * (drag.view.x1 - drag.view.x0)
       emit('pan', { x0: drag.view.x0 - shift, x1: drag.view.x1 - shift })
       return
     }
     // 没有订阅者就不算坐标：hover 跟着每次鼠标移动，白算没意义
     if (state.viewport && handlers.get('hover')?.size) {
-      emit('hover', { x: toDataX(event.offsetX, plotRect(), state.viewport), pixel: event.offsetX })
+      emit('hover', { x: toDataX(event.offsetX, rect, state.viewport), pixel: event.offsetX })
     }
   }
 
@@ -219,7 +250,7 @@ export function createRenderer({ container, options = {} }) {
     }
 
     const rect = plotRect()
-    const range = yRange()
+    const range = paintRange()
     const axis = currentXAxis()
     drawGrid(rect, view, range, axis)
     drawAxisTitles(rect, axis)
@@ -227,6 +258,7 @@ export function createRenderer({ container, options = {} }) {
     for (const series of state.series) drawSeries(series, rect, view, range)
     for (const annotation of state.annotations) drawAnnotation(annotation, rect, view)
     drawNotices()
+    drawZoomHint()
   }
 
   // 横轴描述来自契约（series[].x）。多序列共享 x 轴时，取第一条序列的作为整张图的横轴
@@ -235,7 +267,12 @@ export function createRenderer({ container, options = {} }) {
     return (first && axes[first.name]) || {}
   }
 
-  function yRange() {
+  // 纵轴范围：默认自动适应可见数据；用户手动缩放过就用手动的那个
+  function paintRange() {
+    return state.yView ? { ...state.yView } : autoRange()
+  }
+
+  function autoRange() {
     let lo = Infinity
     let hi = -Infinity
     for (const series of state.series) {
@@ -392,6 +429,18 @@ export function createRenderer({ container, options = {} }) {
     ctx.fillText(text, x, y)
   }
 
+  // 手动缩放必须看得见，还得告诉人怎么退回去——否则图形含义会变得可疑
+  function drawZoomHint() {
+    if (!state.yView) return
+    const text = '纵轴：手动缩放（双击恢复自动）'
+    ctx.font = '12px system-ui, sans-serif'
+    const width = ctx.measureText(text).width + 16
+    const left = Math.max(MARGIN.left, cssWidth - width - 8)
+    ctx.fillStyle = '#fff8e1'
+    ctx.fillRect(left, MARGIN.top, width, 20)
+    drawText(text, left + 8, MARGIN.top + 14, '#8d6e63')
+  }
+
   // ---------- 坐标换算：只在渲染器内部做一次 ----------
 
   function toPixelX(x, rect, view) {
@@ -404,6 +453,10 @@ export function createRenderer({ container, options = {} }) {
 
   function toDataX(pixel, rect, view) {
     return view.x0 + ((pixel - rect.left) / rect.width) * (view.x1 - view.x0)
+  }
+
+  function toDataY(pixel, rect, range) {
+    return range.lo + ((rect.top + rect.height - pixel) / rect.height) * (range.hi - range.lo)
   }
 
   function inView(x, view) {
@@ -419,6 +472,14 @@ export function createRenderer({ container, options = {} }) {
     setAnnotations,
     on,
   }
+}
+
+// 以 anchor 为锚点缩放一个范围。返回 null 表示已缩到最小跨度，调用方应忽略本次操作
+export function zoomRange(range, factor, anchor, minSpan = 1e-9) {
+  const lo = anchor - (anchor - range.lo) * factor
+  const hi = anchor + (range.hi - anchor) * factor
+  if (!(hi - lo > minSpan)) return null
+  return { lo, hi }
 }
 
 // 刻度怎么显示由**轴描述**决定：时间轴显示相对基准的偏移，序号轴显示整数。

@@ -12,12 +12,23 @@ export const strings = {
   connect: '连接',
   reconnect: '重新连接',
   open: '打开',
-  filePath: '数据文件路径',
-  fileHint: '选一个数据源插件：它负责把该格式的日志解析成契约数据',
-  sourcePlugin: '数据源',
-  params: '参数',
-  series: '序列',
+  filePath: '日志文件',
+  fileHint: '选格式 → 选文件 → 打开。格式决定用哪个插件解析这份日志',
+  sourcePlugin: '日志格式',
+  params: '解析参数',
+  browse: '浏览…',
+  series: '曲线',
+  seriesHint: '勾选要显示的曲线（一条曲线 = 数据里的一组 x/y）',
   noSeries: '尚未打开数据',
+
+  browser: {
+    title: '选择日志文件',
+    parent: '上一级',
+    home: '主目录',
+    confirm: '选择',
+    cancel: '取消',
+    truncated: '条目过多，只显示了前 2000 条',
+  },
 
   connection: {
     idle: '未连接',

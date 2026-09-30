@@ -20,7 +20,7 @@
 | `SC` | 使用场景 | 本文件 §5 | SC1–SC7 |
 | `D` | 架构决策 | [DECISIONS.md](DECISIONS.md) | D1–D12 |
 | `U` | UI 层约束 | [ARCHITECTURE.md](ARCHITECTURE.md) §5 | U1–U6 |
-| `M` | 前后端消息 | [messages.md](messages.md) | M1–M17 |
+| `M` | 前后端消息 | [messages.md](messages.md) | M1–M18 |
 | `L` | 实时功能的待定问题 | [roadmap.md](roadmap.md) §3.2 | L1–L6 |
 | `C` | 通信模块的待办项 | [protocol.md](protocol.md) §6 | C1–C4 |
 | `T` | 框架自测项 | [guides/framework-test.md](guides/framework-test.md) §4 | T1–T8 |

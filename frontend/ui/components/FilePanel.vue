@@ -17,6 +17,7 @@ const emit = defineEmits([
   'update:pluginId',
   'update:options',
   'update:selected',
+  'browse',
   'open',
 ])
 
@@ -47,6 +48,7 @@ function toggle(name) {
         @input="emit('update:path', $event.target.value)"
         @keyup.enter="emit('open')"
       />
+      <button :disabled="busy" @click="emit('browse')">{{ strings.browse }}</button>
       <span class="label">{{ strings.sourcePlugin }}</span>
       <select
         :value="pluginId"
@@ -87,6 +89,7 @@ function toggle(name) {
 
     <div v-if="series.length" class="row">
       <span class="label">{{ strings.series }}</span>
+      <em class="note">{{ strings.seriesHint }}</em>
       <label v-for="item in series" :key="item.name" class="check">
         <input
           type="checkbox"
@@ -152,6 +155,12 @@ select {
 
 .check em {
   color: var(--muted);
+  font-style: normal;
+}
+
+.note {
+  color: var(--muted);
+  font-size: 12px;
   font-style: normal;
 }
 

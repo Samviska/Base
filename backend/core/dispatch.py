@@ -19,6 +19,7 @@ from backend.sources import get_plugin as get_source_plugin
 from backend.sources import list_plugins as list_source_plugins
 from backend.sources import load_warnings as source_warnings
 
+from .browse import list_directory
 from .errors import (
     CONTRACT_VIOLATION,
     FILE_NOT_FOUND,
@@ -175,6 +176,13 @@ def _query_range(session: Session, payload: dict) -> dict:
     return session.query(series=series or None, x0=x0, x1=x1, resolution=resolution)
 
 
+def _browse(session: Session, payload: dict) -> dict:
+    path = payload.get("path")
+    if path is not None and not isinstance(path, str):
+        raise CoreError(INVALID_REQUEST, "path 必须是字符串")
+    return list_directory(path)
+
+
 def _get_filter_chain(session: Session, payload: dict) -> dict:
     return {"chain": session.chain}
 
@@ -213,6 +221,7 @@ def _failure(msg_id: Any, msg_type: str, error: CoreError) -> dict:
 
 _COMMANDS: dict[str, Callable[[Session, dict], dict]] = {
     "list_plugins": _list_plugins,
+    "browse": _browse,
     "open_file": _open_file,
     "close_source": _close_source,
     "list_storage_formats": _list_storage_formats,
