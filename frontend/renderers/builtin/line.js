@@ -158,7 +158,12 @@ export function createRenderer({ container, options = {} }) {
       return
     }
 
-    const next = zoomRange(view, factor, toDataX(event.offsetX, rect, view), MIN_SPAN)
+    const next = zoomRange(
+      { lo: view.x0, hi: view.x1 },
+      factor,
+      toDataX(event.offsetX, rect, view),
+      MIN_SPAN,
+    )
     if (next) emit('zoom', { x0: next.lo, x1: next.hi })
   }
 
@@ -474,12 +479,22 @@ export function createRenderer({ container, options = {} }) {
   }
 }
 
-// 以 anchor 为锚点缩放一个范围。返回 null 表示已缩到最小跨度，调用方应忽略本次操作
+// 以 anchor 为锚点缩放一个范围。返回 null 表示已缩到最小跨度，调用方应忽略本次操作。
+//
+// 参数不对时**抛错而不是返回 null**：曾经把 {x0, x1} 当成 {lo, hi} 传进来，
+// NaN 参与比较恒为 false，滚轮就这样静默失灵了——这类错误必须立刻暴露。
 export function zoomRange(range, factor, anchor, minSpan = 1e-9) {
-  const lo = anchor - (anchor - range.lo) * factor
-  const hi = anchor + (range.hi - anchor) * factor
-  if (!(hi - lo > minSpan)) return null
-  return { lo, hi }
+  const lo = range?.lo
+  const hi = range?.hi
+  if (!Number.isFinite(lo) || !Number.isFinite(hi) || !Number.isFinite(anchor)) {
+    throw new TypeError(
+      `zoomRange 需要 {lo, hi} 与数值锚点，收到 ${JSON.stringify(range)} / ${anchor}`,
+    )
+  }
+  const nextLo = anchor - (anchor - lo) * factor
+  const nextHi = anchor + (hi - anchor) * factor
+  if (!(nextHi - nextLo > minSpan)) return null
+  return { lo: nextLo, hi: nextHi }
 }
 
 // 刻度怎么显示由**轴描述**决定：时间轴显示相对基准的偏移，序号轴显示整数。
