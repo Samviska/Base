@@ -13,7 +13,9 @@ export const strings = {
   reconnect: '重新连接',
   open: '打开',
   filePath: '数据文件路径',
-  fileHint: '当前只支持契约 JSON（数据源插件机制尚未实现）',
+  fileHint: '选一个数据源插件：它负责把该格式的日志解析成契约数据',
+  sourcePlugin: '数据源',
+  params: '参数',
   series: '序列',
   noSeries: '尚未打开数据',
 

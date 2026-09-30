@@ -15,6 +15,10 @@ const client = createClient({ url: backendUrl })
 
 const connection = ref(CLIENT_STATE.IDLE)
 const filePath = ref('contract/examples/example-basic.json')
+const sourcePlugins = ref([])
+const pluginId = ref('')
+const pluginOptions = ref({})
+const warnings = ref([])
 const seriesList = ref([])
 const selected = ref([])
 const axes = ref({})
@@ -66,16 +70,40 @@ async function connect() {
   errorText.value = ''
   try {
     await client.connect()
+    await loadPlugins()
   } catch (error) {
     showError(error)
   }
+}
+
+// 插件清单与坏插件警告都来自后端：界面上不写死任何一个插件
+async function loadPlugins() {
+  const payload = await client.request('list_plugins')
+  sourcePlugins.value = payload.plugins.filter((item) => item.type === 'source')
+  warnings.value = payload.warnings || []
+  if (!sourcePlugins.value.some((item) => item.id === pluginId.value)) {
+    selectPlugin(sourcePlugins.value[0]?.id || '')
+  }
+}
+
+function selectPlugin(id) {
+  pluginId.value = id
+  const plugin = sourcePlugins.value.find((item) => item.id === id)
+  // 参数默认值同样来自声明：新增参数不需要改界面
+  pluginOptions.value = Object.fromEntries(
+    (plugin?.params || []).map((decl) => [decl.name, decl.default]),
+  )
 }
 
 async function openFile() {
   errorText.value = ''
   busy.value = true
   try {
-    const summary = await client.request('open_file', { path: filePath.value })
+    const summary = await client.request('open_file', {
+      path: filePath.value,
+      source_plugin: pluginId.value || undefined,
+      options: pluginOptions.value,
+    })
     seriesList.value = summary.series
     // 轴描述与单位都来自数据本身：换一种日志，只要它按契约描述自己，界面就不用改
     axes.value = Object.fromEntries(summary.series.map((item) => [item.name, item.axis]))
@@ -136,9 +164,14 @@ onBeforeUnmount(() => {
 
     <FilePanel
       v-model:path="filePath"
+      :plugins="sourcePlugins"
+      :plugin-id="pluginId"
+      :options="pluginOptions"
       :series="seriesList"
       :selected="selected"
       :busy="busy"
+      @update:pluginId="selectPlugin"
+      @update:options="pluginOptions = $event"
       @update:selected="onSelectionChange"
       @open="openFile"
     />
@@ -159,6 +192,7 @@ onBeforeUnmount(() => {
       :aggregated="aggregated"
       :points="points"
       :viewport="viewport"
+      :warnings="warnings"
       :error="errorText"
     />
   </div>

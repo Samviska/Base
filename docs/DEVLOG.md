@@ -49,6 +49,36 @@
 
 ## 记录
 
+### 2026-09-30 | 前端 | 插件选择与参数控件（按声明生成）
+
+**改动**：
+
+- `frontend/ui/components/FilePanel.vue`：增加数据源插件下拉与**参数控件**——控件种类由
+  参数声明的 `type` 决定（字符串 → 文本框、int/float → 数字框、enum → 下拉），
+  数值型按声明转成数字（不转的话后端会判为非法请求）
+- `frontend/ui/App.vue`：连接后拉 `list_plugins`，取数据源插件与 `warnings`；
+  切换插件时按声明写回默认值；`open_file` 带上 `source_plugin` 与 `options`
+- `frontend/ui/components/StatusBar.vue`：显示坏插件警告（S4）
+- 文案表补「数据源」「参数」两条；`docs/modules/ui-shell.md` §5 补"界面元素 ← 声明"的来源表
+
+**原因**：后端插件机制已就绪，但界面只会发 `path`（默认走 `contract-json`），
+真实日志在界面上依然打不开——差的就是这一步。
+
+**影响面**：契约**未变**；用到的都是已登记的字段（M3 的 `source_plugin` / `options`、
+M2 的 `params` / `warnings`）。界面里**没有任何插件专名**：下拉项与控件全部由后端声明生成，
+所以新增一个插件时本模块改动应为 0 行（U2 的验收方法）。
+
+**验证**：
+
+- `npm test` → 13 条通过（含 2 条连真后端的联通用例）
+- `npm run build` → 通过
+- 端到端（真服务 + 前端通信层）：插件下拉列出 `contract-json` 与 `jp18-ecg`；
+  用 `jp18-ecg` + `sample_rate: 500` 打开 655 KB 的真实日志 → **67160 点**、横轴 `time/ms`、
+  `x_range [0, 134318]`；随后全览 `query_range` → 1920 个像素列
+- 浏览器里的最终视觉效果待确认
+
+**相关**：[modules/ui-shell.md](modules/ui-shell.md) §5、[messages.md](messages.md) M2 / M3
+
 ### 2026-09-30 | 前端 | 渲染器按轴描述显示坐标轴（数据自描述落地）
 
 **改动**：

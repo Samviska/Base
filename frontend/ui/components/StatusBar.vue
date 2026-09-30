@@ -8,6 +8,7 @@ const props = defineProps({
   aggregated: { type: Boolean, default: false },
   points: { type: Number, default: 0 },
   viewport: { type: Object, default: null },
+  warnings: { type: Array, default: () => [] },
   error: { type: String, default: '' },
 })
 
@@ -32,6 +33,8 @@ function format(value) {
     </span>
     <span>{{ strings.points }}：{{ points }}</span>
     <span>{{ strings.viewport }}：{{ viewportText }}</span>
+    <!-- 坏插件不该让应用起不来，但使用者必须知道它坏了（S4） -->
+    <span v-if="warnings.length" class="warn">{{ warnings.join('；') }}</span>
     <span v-if="error" class="error">{{ error }}</span>
   </footer>
 </template>
@@ -81,5 +84,9 @@ function format(value) {
 
 .error {
   color: var(--danger);
+}
+
+.warn {
+  color: var(--warn);
 }
 </style>
