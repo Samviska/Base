@@ -54,6 +54,22 @@ python scripts/setup.py
 
 ---
 
+## 跑起来（开发期）
+
+```powershell
+# 后端：WebSocket 服务（默认 ws://127.0.0.1:8765，端口被占用时换一个）
+.venv\Scripts\python.exe -m backend.server
+.venv\Scripts\python.exe -m backend.server --port 8791
+
+# 检查与用例
+.venv\Scripts\python.exe scripts\check_docs.py
+.venv\Scripts\python.exe -m unittest discover -s backend/tests -t . -v
+```
+
+开发期**直接跑源码，不打包**；前端将来由 Vite dev server 提供，改完即见。
+
+---
+
 ## 从这里开始
 
 1. **`AGENTS.md`** —— 规则入口（AI 会话会自动加载它）
@@ -70,6 +86,7 @@ python scripts/setup.py
 
 ## 当前状态
 
-**骨架阶段**：目录结构、开发文档、数据契约、工具链均已就绪，**尚无实现代码**。
+**开发中**：契约校验器、滤波与聚合、核心编排与 WebSocket 服务已落地并有用例覆盖；
+数据源插件与存储（第 2 批）、前端（第 5 批）、标注与会话持久化（第 6 批）待做。
 
-下一步按 `docs/DEVLOG.md` 的记录推进。
+进度与影响面以 `docs/DEVLOG.md` 为准，动手顺序见 `docs/guides/kickoff.md` §五。

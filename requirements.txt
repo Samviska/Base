@@ -5,3 +5,6 @@
 #
 # 更新方式：改这里的版本号 → python scripts/setup.py
 jsonschema==4.26.0
+# WebSocket 服务端与客户端（测试也用它）。标准库没有 WebSocket，
+# 手写帧解析与掩码的代价远高于多一个依赖
+websockets==17.1

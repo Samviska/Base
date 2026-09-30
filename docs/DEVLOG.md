@@ -49,6 +49,45 @@
 
 ## 记录
 
+### 2026-09-30 | 核心与通信 | WebSocket 服务与命令分发落地（第 4 批）
+
+**改动**：
+
+- 新增 `backend/core/`：`session.py`（会话与三层缓存）、`dispatch.py`（消息 → 响应）、
+  `errors.py`（错误码集中定义）、`source.py`（**过渡**数据源入口，直接读契约 JSON）
+- 新增 `backend/server/`：`app.py`（端点、信封、`hello` 事件）、`__main__.py`（启动入口）
+- 新增用例 `backend/tests/test_core.py`（28 个）与 `test_server.py`（6 个：起真服务 + 真客户端）
+- `requirements.txt` 增加 `websockets==17.1`——标准库没有 WebSocket 服务端，
+  手写帧解析与掩码的代价远高于多一个依赖
+- 同步 `docs/modules/core.md`、`docs/modules/server.md`、`docs/protocol.md` §6、
+  `README.md`（补"跑起来"与当前状态）、`docs/modules/filter.md`（补浮点残差一行）
+
+**原因**：kickoff §五 第 4 批。数据源与存储（第 2 批）是插件形态、按用户要求搁置，
+因此核心先接一个**过渡入口**直接读契约 JSON；插件机制就绪后删掉 `source.py`、
+改为调插件注册表，命令层的请求与响应形状不变。
+
+**影响面**：契约**结构未变**，`schema_version` 仍为 `1.0`，**无需迁移**。
+新增运行依赖 `websockets`（`Requires-Python >=3.11`，与项目下限一致，CI 的 3.11 可装）。
+已实现 `list_plugins`/`open_file`/`close_source`/`list_storage_formats`/`query_range`/
+`get_filter_chain`/`set_filter_chain`；标注（M9–M12）与会话（M13、M14）尚未实现，
+收到时回 `INTERNAL` 并说明"尚未实现"——它们确实登记在 messages.md 里，谎报 `UNKNOWN_TYPE` 是错的。
+`list_storage_formats` 如实回空数组而不是伪造一个格式。
+
+**验证**：
+
+- `.venv\Scripts\python.exe -m unittest discover -s backend/tests -t . -v` → 92 个用例通过
+- 端到端（`python -m backend.server --port 8791` + 真客户端）：
+  `hello` → `list_plugins` = `[moving-average]` → `open_file` 摘要（温度 5 点、`x_range [0,400]`）
+  → `query_range` `aggregated=true`、`ymin=[25.1, 26.0]`、`ymax=[25.3, 26.2]`；
+  `resolution=0` 回 `INVALID_REQUEST`，`id` 原样回显
+- 会话隔离：A 连接打开文件后，B 连接的 `query_range` 回 `INVALID_REQUEST`
+- **滤波在聚合之前**：`set_filter_chain` 后同一视口的结果由 `[25.1, 26.0]` 变为 `[25.2, 26.1]`，
+  说明滤波缓存与聚合缓存都失效了
+- 一条坏 JSON 不会断连接：发完非法消息后，同连接上的下一条请求仍收到正常响应
+
+**相关**：[guides/kickoff.md](guides/kickoff.md) §五 第 4 批、[modules/core.md](modules/core.md)、
+[modules/server.md](modules/server.md)、[messages.md](messages.md)、[protocol.md](protocol.md) §6
+
 ### 2026-09-30 | 滤波与聚合 | 像素列 min/max 与处理链落地（第 3 批）
 
 **改动**：
