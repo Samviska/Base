@@ -256,6 +256,9 @@
 > 前端**不需要为数据量分支写代码**：它总是发同样的请求，按返回的标志选择绘制模式。
 > 界面还必须据此**标注"当前处于聚合显示状态"**（见 [ARCHITECTURE.md](ARCHITECTURE.md) §4）。
 
+聚合时 `x[i]` 是**该像素列的中心**；某列没有数据点时 `ymin[i]` 与 `ymax[i]` 都是 `null`
+（**不是 0**），渲染器应跳过该列。列的划分与边界归属见 [modules/aggregate.md](modules/aggregate.md) §3。
+
 **节流要求**：此消息必须按帧节流 + 代次作废发送。见 [protocol.md](protocol.md) §4。
 
 ---

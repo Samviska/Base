@@ -8,19 +8,48 @@
 
 ## 2. 代码位置
 
-| 内容 | 路径（规划） |
+| 内容 | 路径 |
 | --- | --- |
-| 聚合算法与缓存 | `backend/aggregate/` |
+| 策略实现（像素列 min/max） | `backend/aggregate/pixel_columns.py` |
+| 对外入口 | `backend/aggregate/__init__.py` |
+| 用例 | `backend/tests/test_aggregate.py` |
+
+> **缓存不在本模块**：它按"（范围, 分辨率）"作键，属于[核心](core.md)的职责（第 4 批）。
+> 本模块保持无状态，同样的入参一定得到同样的结果。
 
 ## 3. 对外接口
 
-```
-aggregate(series, range, resolution) -> { points, aggregated: bool }
+```python
+from backend.aggregate import aggregate_range
+
+aggregate_range(dataset, *, x0, x1, resolution, names=None) -> dict
+# → {"aggregated": bool, "series": [{"name": ..., "x": [...], "ymin": [...], "ymax": [...]}, ...]}
 ```
 
-- `range`：视口范围
-- `resolution`：目标分辨率，通常是画布像素宽度
-- `aggregated`：本次是否发生了聚合（供界面标注）
+返回值**就是** M 消息 `query_range` 的响应 payload（[messages.md](../messages.md) M6）：
+核心层原样回给前端，不做二次组装。
+
+| 参数 | 含义 |
+| --- | --- |
+| `dataset` | 契约数据（全量，已经过校验） |
+| `x0` / `x1` | 视口范围（闭区间）；`x1 <= x0` 视为空视口，返回空数组 |
+| `resolution` | 目标分辨率，由前端给出画布像素宽度；小于 1 抛 `ValueError` |
+| `names` | 只取这些序列；省略或空 = 全部。未知序列名被忽略（不报错） |
+
+行为约定：
+
+| 项 | 约定 |
+| --- | --- |
+| **列定义** | 半开区间 `[x0 + c*w, x0 + (c+1)*w)`，`w = (x1-x0)/resolution`；**右端点 `x1` 归最后一列** |
+| **列的代表 x** | 列中心 `x0 + (c+0.5)*w`——竖线段落在该像素列中心，而不是整体偏左半列 |
+| **未超过分辨率** | 返回原始点，`aggregated=false`，且 `ymin[i] == ymax[i]` |
+| **超过分辨率** | 每列取列内所有点的 min/max，`aggregated=true` |
+| **空列** | 该列没有点、或列内全是 `null` → `ymin`/`ymax` 都是 `null`（**不是 0**） |
+| **`null`** | 不参与 min/max；`x` 为 `null` 的点视为不在任何视口内 |
+| **分类轴** | `kind: categorical` 的序列按**索引**当横轴（分类在界面上等宽分布），视口也按索引表示 |
+| **`x` 与 `y` 不等长** | 抛 `ValueError`，**不静默截断**——截断会画出一条错的曲线 |
+
+`aggregated` 是**整包**的：任一条序列发生了聚合即为 `true`（M6 只有这一个标志）。
 
 ## 4. 依赖规则
 
@@ -52,7 +81,10 @@ aggregate(series, range, resolution) -> { points, aggregated: bool }
 | 每次缩放都重新全量扫描 | 大数据下缩放卡顿 | 缓存聚合结果；必要时建多级聚合金字塔 |
 | 列边界的浮点处理 | 相邻列重复计算或漏掉边界点 | 明确"半开区间"的列定义，并写边界测试 |
 | `null` 污染 min/max | 图形出现假的极值 | 跳过 `null` 后再比较 |
-| 多序列共享 x 轴时重复扫描 | 性能浪费 | x 相同则一次扫描，同时产出各序列的聚合结果 |
+| 多序列共享 x 轴时重复扫描 | 性能浪费 | 当前按序列独立聚合；共享扫描留给核心缓存层 |
+| 列边界的浮点误差 | 边界点落到相邻列 | 列定义写成半开区间 + 右端点显式归最后一列，边界测试用整百的数值 |
+| 空列写成 0 | 图上出现一段假的平线（"设备在输出 0"的错觉） | 空列给 `null`，渲染器跳过该列 |
+| 假设 x 单调 | 有时钟跳变的数据被裁掉一大段 | 逐点判定视口，不依赖可选的 `monotonic` 声明 |
 
 ## 8. 相关
 

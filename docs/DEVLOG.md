@@ -49,6 +49,45 @@
 
 ## 记录
 
+### 2026-09-30 | 滤波与聚合 | 像素列 min/max 与处理链落地（第 3 批）
+
+**改动**：
+
+- 新增 `backend/aggregate/`：`aggregate_range(dataset, *, x0, x1, resolution, names=None)`，
+  返回值**即** M 消息 `query_range` 的响应 payload。视口裁剪与列内 min/max 合并成一次遍历
+- 新增 `backend/filters/`：`apply_chain` / `chain_key` / `get_plugin` / `list_plugins` / `register`，
+  外加示例插件 `moving-average`（窗口居中、边界收缩、窗口含 `null` 则结果也是 `null`；
+  前缀和实现，耗时与窗口大小无关）
+- 新增用例 `backend/tests/test_aggregate.py`（23 个）与 `backend/tests/test_filters.py`（22 个）
+- 同步 `docs/modules/aggregate.md`、`docs/modules/filter.md`、`docs/guides/add-filter-plugin.md`
+  （从"待建"改为可执行步骤）、`docs/messages.md` M6 补一段说明
+
+**原因**：kickoff §五 第 3 批。此前"禁止抽样""滤波在聚合之前"只有原则，没有可执行实现。
+第 2 批（数据源与存储）是插件形态，按用户要求搁置——本批只依赖契约，不依赖数据源。
+
+**影响面**：契约**结构未变**，`schema_version` 仍为 `1.0`，**无需迁移**。
+两个模块的接口形状与 M6 / `set_filter_chain` 对齐，第 4 批核心直接调用，不必再改。
+`messages.md` M6 补的是**说明**（聚合时 `x` 为像素列中心、空列 `ymin`/`ymax` 为 `null`），
+不增删字段。滤波插件机制本批只做**显式登记**，"目录即插件"的扫描与 manifest 仍待插件机制批次；
+聚合缓存按设计属核心层（第 4 批），本模块保持无状态。
+
+**验证**：
+
+- `.venv\Scripts\python.exe -m unittest discover -s backend/tests -t . -v` → 58 个用例通过
+- 完成标志：点数超过分辨率 → 返回 min/max 对；未超过 → 原始点且 `ymin[i] == ymax[i]`
+- **尖峰可见**：1000 个 0 里埋一个 999，`resolution=10` 全览时它出现在 `ymax` 中；
+  视口外的极端值不参与（裁剪正确）
+- **列边界**：`x0=0, x1=400, resolution=4` → `x=100` 属第 1 列、`x=400`（右端点）属最后一列，
+  `ymin=[1,2,3,4]`、`ymax=[1,2,3,5]`
+- 缺失值：`null` 不参与 min/max；整列无有效值时为 `null` 而不是 0
+- 滤波：`[1,2,3,4,5]` 窗口 3 → `[1.5, 2, 3, 4, 4.5]`；窗口含 `null` → 结果 `null`
+- 纯函数：滤波后入参深比较不变；`enabled: false` 时输出与入参逐字段一致；输出仍通过契约校验器
+- 实测（100 万点）：聚合 293 ms；滑动平均窗口 5 / 101 / 999 均约 0.45 s
+  （改前缀和之前，窗口 101 需 5.1 s——拖滑块会明显卡，故本批就换掉）
+
+**相关**：[guides/kickoff.md](guides/kickoff.md) §五 第 3 批、[modules/aggregate.md](modules/aggregate.md)、
+[modules/filter.md](modules/filter.md)、[ARCHITECTURE.md](ARCHITECTURE.md) §4、[DECISIONS.md](DECISIONS.md) D5
+
 ### 2026-09-30 | 契约 | 校验器落地：schema + 跨字段检查，接入 pre-commit 与 CI
 
 **改动**：
