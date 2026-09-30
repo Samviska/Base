@@ -322,6 +322,26 @@ test('双击重置：只拖拽过横轴也能一键回全览', () => {
   assert.deepEqual(zooms, [{ x0: 0, x1: 2 }], '双击没有回到完整范围')
 })
 
+test('resetView 方法可直接调用（界面上的「全览」按钮走它）', () => {
+  const dom = setupDom()
+  const renderer = createRenderer({ container: dom.container, options: { fullRange: [0, 2] } })
+  renderer.mount()
+  renderer.setData({
+    aggregated: false,
+    series: [{ name: 's', x: [0, 1, 2], ymin: [0, 10, 20], ymax: [0, 10, 20] }],
+  })
+  renderer.setViewport({ x0: 0, x1: 2 })
+  dom.flush()
+
+  const zooms = []
+  renderer.on('zoom', (view) => zooms.push(view))
+
+  renderer.setViewport({ x0: 0.5, x1: 1.5 })
+  renderer.resetView()
+
+  assert.deepEqual(zooms, [{ x0: 0, x1: 2 }], 'resetView 没有回到完整范围')
+})
+
 test('已经在全览且纵轴自动时，双击不做事', () => {
   const dom = setupDom()
   const renderer = createRenderer({ container: dom.container, options: { fullRange: [0, 2] } })

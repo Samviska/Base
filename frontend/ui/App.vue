@@ -115,13 +115,12 @@ async function openFile() {
     aggregated.value = false
     points.value = 0
 
-    // 轴描述变了就换一个渲染器实例，避免把上一份数据的轴信息带过来
+    // 顺序要紧：渲染器在 mount 时读取 fullRange，先重建再赋值它就只能读到旧值
+    // （"双击回不到全览"就是这么来的）
+    const axisRange = summary.series[0]?.x_range
+    fullRange.value = axisRange || null
     datasetId.value += 1
     await nextTick()
-
-    const axisRange = summary.series[0]?.x_range
-    // 双击"回到全览"要用到完整范围，而前端除了这个摘要拿不到别的
-    fullRange.value = axisRange || null
     applyViewport(axisRange ? { x0: axisRange[0], x1: axisRange[1] } : { x0: 0, x1: 1 })
   } catch (error) {
     showError(error)
@@ -133,6 +132,11 @@ async function openFile() {
 function onSelectionChange(next) {
   selected.value = next
   schedule()
+}
+
+// 与"双击画布"同一个动作：渲染器会自己发 zoom 回到完整范围
+function resetView() {
+  chart.value?.resetView()
 }
 
 onMounted(() => {
@@ -161,6 +165,7 @@ onBeforeUnmount(() => {
       </div>
       <div class="conn">
         <span class="muted">{{ strings.backend }}：{{ backendUrl }}</span>
+        <button :disabled="!fullRange" @click="resetView">{{ strings.resetView }}</button>
         <button :disabled="connection === 'connecting'" @click="connect">
           {{ strings.reconnect }}
         </button>

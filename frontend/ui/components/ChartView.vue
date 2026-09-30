@@ -36,6 +36,7 @@ defineExpose({
   appendData: (payload) => renderer?.appendData(payload),
   setViewport: (view) => renderer?.setViewport(view),
   setAnnotations: (list) => renderer?.setAnnotations(list),
+  resetView: () => renderer?.resetView(),
   plotWidth: () => host.value?.clientWidth || 0,
 })
 </script>

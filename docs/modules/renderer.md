@@ -27,6 +27,7 @@ renderer.setData(payload)        // 整体替换：payload 就是 M6 query_range
 renderer.appendData(chunk)       // 追加同名序列的数据（实时推送将来走这里）
 renderer.setViewport({ x0, x1 }) // 数据坐标
 renderer.setAnnotations(list)
+renderer.resetView()             // 重置视图：纵轴回自动适应、横轴回数据完整范围
 renderer.on(event, handler)      // 返回取消订阅函数
 ```
 
@@ -86,6 +87,10 @@ renderer.on(event, handler)      // 返回取消订阅函数
 **双击的判定不要求"先缩放过纵轴"**：只要当前不是"纵轴自动 + 横轴在全览"，它就会重置——
 拖拽平移之后同样能一键回全览。它需要的数据完整范围由上层经 `options.fullRange` 传入：
 渲染器拿不到全量数据，这是分层纪律（[ARCHITECTURE.md](../ARCHITECTURE.md) §2.1）。
+
+> **接线顺序**：`options.fullRange` 只在 `mount` 时读一次，所以上层必须**先把范围准备好再创建渲染器**。
+> 曾经因为先重建渲染器、后赋值范围，双击就"回不到全览"了——表现是只恢复纵轴，
+> 横轴留在缩放后的那一段。界面上的「全览」按钮调用同一个 `resetView()`，行为不分叉。
 
 **拖拽不会因为指针移出画布而中断**（指针捕获在工作），只由 `pointerup` / `pointercancel` 结束。
 

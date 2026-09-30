@@ -11,6 +11,9 @@ export const VIEW_EVENTS = ['zoom', 'pan', 'mark-add', 'mark-remove', 'hover']
 
 // 事件 payload：zoom / pan 都是 { x0, x1 }（数据坐标），由 UI 决定要不要据此请求数据。
 // hover 是 { x, pixel }。
+//
+// resetView()：把视图复位（纵轴回自动适应、横轴回数据完整范围），
+// 与"双击画布"是同一个动作——界面上的「全览」按钮调它，行为不会与双击分叉。
 const REQUIRED_METHODS = [
   'mount',
   'unmount',
@@ -18,6 +21,7 @@ const REQUIRED_METHODS = [
   'appendData',
   'setViewport',
   'setAnnotations',
+  'resetView',
   'on',
 ]
 

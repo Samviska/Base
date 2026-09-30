@@ -178,9 +178,9 @@ export function createRenderer({ container, options = {} }) {
     return 'plot'
   }
 
-  function onDoubleClick() {
-    // 双击 = 重置视图。**不要求"先手动缩放过纵轴"**：滚动、拖拽之后都该能一键回全览，
-    // 否则想看全局却发现回不去，只能靠刷新页面。
+  // 重置视图：纵轴回自动适应，横轴回**数据完整范围**（完整范围由上层经 options.fullRange 给）。
+  // 双击与界面上的「全览」按钮走同一条路径，行为不会分叉。
+  function resetView() {
     const view = state.viewport
     const yIsAuto = state.yView === null
     const xIsFull = !fullRange || !view || (view.x0 === fullRange[0] && view.x1 === fullRange[1])
@@ -189,6 +189,10 @@ export function createRenderer({ container, options = {} }) {
     state.yView = null
     if (!xIsFull && fullRange) emit('zoom', { x0: fullRange[0], x1: fullRange[1] })
     requestDraw()
+  }
+
+  function onDoubleClick() {
+    resetView()
   }
 
   function onPointerDown(event) {
@@ -503,6 +507,7 @@ export function createRenderer({ container, options = {} }) {
     appendData,
     setViewport,
     setAnnotations,
+    resetView,
     on,
   }
 }

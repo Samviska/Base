@@ -11,6 +11,7 @@ export const strings = {
   backend: '后端地址',
   connect: '连接',
   reconnect: '重新连接',
+  resetView: '全览',
   open: '打开',
   filePath: '日志文件',
   fileHint: '选格式 → 选文件 → 打开。格式决定用哪个插件解析这份日志',
