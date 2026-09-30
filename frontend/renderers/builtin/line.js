@@ -19,6 +19,7 @@ export { assertRenderer } from '../interface.js'
 
 export function createRenderer({ container, options = {} }) {
   const axes = options.axes || {}
+  const units = options.units || {}
   const handlers = new Map()
 
   let canvas = null
@@ -219,11 +220,19 @@ export function createRenderer({ container, options = {} }) {
 
     const rect = plotRect()
     const range = yRange()
-    drawGrid(rect, view, range)
+    const axis = currentXAxis()
+    drawGrid(rect, view, range, axis)
+    drawAxisTitles(rect, axis)
 
     for (const series of state.series) drawSeries(series, rect, view, range)
     for (const annotation of state.annotations) drawAnnotation(annotation, rect, view)
     drawNotices()
+  }
+
+  // 横轴描述来自契约（series[].x）。多序列共享 x 轴时，取第一条序列的作为整张图的横轴
+  function currentXAxis() {
+    const first = state.series[0]
+    return (first && axes[first.name]) || {}
   }
 
   function yRange() {
@@ -249,7 +258,7 @@ export function createRenderer({ container, options = {} }) {
     return { lo: lo - pad, hi: hi + pad }
   }
 
-  function drawGrid(rect, view, range) {
+  function drawGrid(rect, view, range, axis) {
     ctx.strokeStyle = '#eceff1'
     ctx.fillStyle = '#78909c'
     ctx.font = '11px system-ui, sans-serif'
@@ -263,7 +272,7 @@ export function createRenderer({ container, options = {} }) {
       ctx.stroke()
       const value = view.x0 + ((view.x1 - view.x0) * i) / TICKS
       ctx.textAlign = 'center'
-      ctx.fillText(formatNumber(value), px, rect.top + rect.height + 16)
+      ctx.fillText(formatTick(value, axis), px, rect.top + rect.height + 16)
     }
 
     for (let i = 0; i <= TICKS; i += 1) {
@@ -275,6 +284,22 @@ export function createRenderer({ container, options = {} }) {
       const value = range.lo + ((range.hi - range.lo) * i) / TICKS
       ctx.textAlign = 'right'
       ctx.fillText(formatNumber(value), rect.left - 6, py + 4)
+    }
+  }
+
+  // 轴标题与纵轴单位都来自契约：数据说自己是什么，界面就显示什么
+  function drawAxisTitles(rect, axis) {
+    const first = state.series[0]
+    const title = [axis.display_name || first?.name || '', axis.unit ? `（${axis.unit}）` : ''].join('')
+    if (title) {
+      ctx.fillStyle = '#546e7a'
+      ctx.textAlign = 'right'
+      ctx.fillText(title, rect.left + rect.width, cssHeight - 8)
+    }
+    const unit = first ? units[first.name] : ''
+    if (unit) {
+      ctx.textAlign = 'left'
+      ctx.fillText(`单位：${unit}`, MARGIN.left, 12)
     }
   }
 
@@ -335,7 +360,8 @@ export function createRenderer({ container, options = {} }) {
 
   function drawNotices() {
     const notices = collectNotices()
-    let offset = 0
+    // 从 22 起步：左上角那一行留给纵轴单位
+    let offset = 22
     for (const notice of notices) {
       ctx.fillStyle = '#fff8e1'
       const width = ctx.measureText(notice).width + 16
@@ -393,6 +419,17 @@ export function createRenderer({ container, options = {} }) {
     setAnnotations,
     on,
   }
+}
+
+// 刻度怎么显示由**轴描述**决定：时间轴显示相对基准的偏移，序号轴显示整数。
+// 这是"数据自描述"落到界面上的那一环——换一种数据，只要它按契约描述自己的轴，这里就不用改。
+export function formatTick(value, axis = {}) {
+  if (axis.kind === 'time' && axis.tick_format === 'offset_seconds') {
+    const seconds = value / 1000
+    return `${seconds >= 0 ? '+' : ''}${Number.isInteger(seconds) ? seconds : seconds.toFixed(1)}s`
+  }
+  if (axis.kind === 'sequence') return String(Math.round(value))
+  return formatNumber(value)
 }
 
 function formatNumber(value) {

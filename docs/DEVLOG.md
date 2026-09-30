@@ -49,6 +49,29 @@
 
 ## 记录
 
+### 2026-09-30 | 前端 | 渲染器按轴描述显示坐标轴（数据自描述落地）
+
+**改动**：
+
+- `frontend/renderers/builtin/line.js`：新增轴标题与纵轴单位显示；刻度按轴描述格式化
+  （导出 `formatTick`）——`kind: time` + `tick_format: offset_seconds` 显示 `+12.5s`，
+  `kind: sequence` 显示整数；横轴描述取 `options.axes`、纵轴单位取新增的 `options.units`
+- `frontend/ui/ChartView.vue`、`App.vue`：把 M3 摘要里的 `axis` 与 `unit` 传给渲染器
+- `docs/modules/renderer.md` 补 §3.1「轴描述 → 界面显示」映射表
+- 用例：`frontend/tests/renderer-interface.test.js` 增加刻度格式化断言
+
+**原因**：用户提出"通过读取 JSON 的特征来知道横轴纵轴该显示什么，我们提供标准"——
+这正是契约 §4.2 轴描述那一层的用途。此前渲染器把刻度画成裸数字，轴名与单位都看不到。
+
+**影响面**：契约**未变**；渲染器 `options` 新增可选字段 `units`，**渲染器接口的 7 个方法一个没变**
+（第三方渲染器仍合规）。`categorical` 轴的刻度标签仍显示不出来——M6 的响应只带索引不带轴数据，
+已记入 renderer.md 坑表，属第 6 批（柱状图）。
+
+**验证**：`npm test` → 13 条通过（含刻度格式化 6 个断言）；`npm run build` → 通过。
+浏览器里的视觉效果待确认。
+
+**相关**：[modules/renderer.md](modules/renderer.md) §3.1、[contract.md](contract.md) §4.2
+
 ### 2026-09-30 | 数据源 | 插件机制落地 + JP18 心电日志解析（第 2 批·上）
 
 **改动**：

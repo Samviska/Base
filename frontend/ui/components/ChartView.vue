@@ -5,6 +5,7 @@ import { createRenderer } from '../../renderers/builtin/line.js'
 
 const props = defineProps({
   axes: { type: Object, default: () => ({}) },
+  units: { type: Object, default: () => ({}) },
 })
 const emit = defineEmits(['zoom', 'pan'])
 
@@ -13,7 +14,10 @@ let renderer = null
 
 onMounted(() => {
   // UI 只把容器交出去：渲染器内部不引用 Vue，两者之间只有数据与事件（renderer.md 硬规则 1）
-  renderer = createRenderer({ container: host.value, options: { axes: props.axes } })
+  renderer = createRenderer({
+    container: host.value,
+    options: { axes: props.axes, units: props.units },
+  })
   renderer.mount()
   renderer.on('zoom', (view) => emit('zoom', view))
   renderer.on('pan', (view) => emit('pan', view))

@@ -18,6 +18,7 @@ const filePath = ref('contract/examples/example-basic.json')
 const seriesList = ref([])
 const selected = ref([])
 const axes = ref({})
+const units = ref({})
 const viewport = ref(null)
 const aggregated = ref(false)
 const points = ref(0)
@@ -76,7 +77,9 @@ async function openFile() {
   try {
     const summary = await client.request('open_file', { path: filePath.value })
     seriesList.value = summary.series
+    // 轴描述与单位都来自数据本身：换一种日志，只要它按契约描述自己，界面就不用改
     axes.value = Object.fromEntries(summary.series.map((item) => [item.name, item.axis]))
+    units.value = Object.fromEntries(summary.series.map((item) => [item.name, item.unit]))
     selected.value = summary.series.map((item) => item.name)
     aggregated.value = false
     points.value = 0
@@ -145,6 +148,7 @@ onBeforeUnmount(() => {
         :key="datasetId"
         ref="chart"
         :axes="axes"
+        :units="units"
         @zoom="applyViewport"
         @pan="applyViewport"
       />

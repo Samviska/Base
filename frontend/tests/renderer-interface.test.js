@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { createRenderer } from '../renderers/builtin/line.js'
+import { createRenderer, formatTick } from '../renderers/builtin/line.js'
 import { VIEW_EVENTS, assertRenderer } from '../renderers/interface.js'
 
 test('内置折线图满足渲染器接口约定', () => {
@@ -44,4 +44,13 @@ test('事件订阅返回可用的取消函数', () => {
 
 test('事件类型清单是接口的一部分', () => {
   assert.deepEqual(VIEW_EVENTS, ['zoom', 'pan', 'mark-add', 'mark-remove', 'hover'])
+})
+
+test('刻度按轴描述格式化：数据说自己是什么，就显示成什么', () => {
+  assert.equal(formatTick(12.5, { kind: 'sequence' }), '13') // 序号轴给整数
+  assert.equal(formatTick(0, { kind: 'sequence' }), '0')
+  assert.equal(formatTick(12500, { kind: 'time', tick_format: 'offset_seconds' }), '+12.5s')
+  assert.equal(formatTick(-1500, { kind: 'time', tick_format: 'offset_seconds' }), '-1.5s')
+  assert.equal(formatTick(2000, { kind: 'time', tick_format: 'offset_seconds' }), '+2s')
+  assert.equal(formatTick(250, {}), '250.0') // 没有轴描述时退回普通数值格式
 })
