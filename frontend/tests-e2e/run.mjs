@@ -57,7 +57,11 @@ function makeJp18Log(count) {
         continue
       }
       const index = written + i
-      const value = index === spikeAt ? 900000 : Math.round(200000 * Math.sin(index / 250))
+      // 确定性伪随机抖动：真实设备数据就是这样，相邻点有几百到几千的跳变。
+      // 纯正弦看不出"聚合显示时竖线像毛刺"那个问题
+      const noise = ((index * 2654435761) % 4001) - 2000
+      const spike = index === spikeAt ? 700000 : 0
+      const value = Math.round(200000 * Math.sin(index / 250)) + noise + spike
       bytes.push((value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff)
     }
     bytes.push(0x00, 0x02, 0x80, 0xa0)
@@ -235,7 +239,25 @@ async function main() {
   const afterButton = await viewport(page)
   check(near(afterButton[0], 0, 1e-9) && near(afterButton[1], 39996, 1e-6), `按钮回到完整范围：${JSON.stringify(afterButton)}`)
 
-  console.log('\n【8】放大到点数少于分辨率 = 回到原始点')
+  console.log('\n【8】临界区：每列只剩一两个点时的显示')
+  // 视口内点数略多于画布列数时每列只有一两个点，竖线最显眼——
+  // 使用者最容易在这里觉得"波形变成了一片毛刺"
+  await page.mouse.move(plot.x, plot.y)
+  for (let i = 0; i < 40; i += 1) {
+    await page.mouse.wheel(0, -240)
+    const view = await viewport(page)
+    if (view[1] - view[0] <= 5200) break
+    await page.waitForTimeout(60)
+  }
+  await page.waitForTimeout(500)
+  const critical = await viewport(page)
+  check(
+    (await text(page, 'status-aggregated')).includes('聚合'),
+    `临界区仍是聚合显示（跨度 ${(critical[1] - critical[0]).toFixed(0)} ms、绘制 ${await drawPoints(page)} 点）`,
+  )
+  await page.screenshot({ path: resolve(LOCAL, 'e2e-05-临界放大.png') })
+
+  console.log('\n【9】放大到点数少于分辨率 = 回到原始点')
   // 视口收窄到约 200 ms（50 个样本），远少于画布宽度
   await page.mouse.move(plot.x, plot.y)
   for (let i = 0; i < 40; i += 1) await page.mouse.wheel(0, -240)
@@ -247,7 +269,7 @@ async function main() {
   check(fewPoints < 400, `原始点模式下绘制点数变小（实际 ${fewPoints}）`)
   await page.screenshot({ path: resolve(LOCAL, 'e2e-04-原始点.png') })
 
-  console.log('\n【9】勾掉曲线 = 图上少一条')
+  console.log('\n【10】勾掉曲线 = 图上少一条')
   const folder = resolve(ROOT, 'contract', 'examples', 'example-basic.json')
   check(await pluginsReady(page), '插件下拉仍可用')
   await page.getByTestId('source-plugin').selectOption('contract-json')
@@ -259,7 +281,7 @@ async function main() {
   await page.waitForTimeout(400)
   check((await drawPoints(page)) === 4, `取消「温度」后只剩 4 点（实际 ${await drawPoints(page)}）`)
 
-  console.log('\n【10】光标：添加两个、拖动、读差值')
+  console.log('\n【11】光标：添加两个、拖动、读差值')
   // 回到大日志上做，两个光标才有明显的 ΔX / ΔY
   check(await pluginsReady(page), '插件下拉仍可用')
   await page.getByTestId('source-plugin').selectOption('jp18-ecg')
@@ -299,7 +321,7 @@ async function main() {
   check(!/ΔX 0\.00.*ΔY 0\.00/.test(deltaText.replace(/\s+/g, ' ')), '两个光标不重叠，差值不是全 0')
   await page.screenshot({ path: resolve(LOCAL, 'e2e-06-光标.png') })
 
-  console.log('\n【11】聚合显示时明确标出"取的是像素列极值"')
+  console.log('\n【12】聚合显示时明确标出"取的是像素列极值"')
   const note = await page.getByTestId('cursor-aggregated-note').count()
   check(note === 1, '聚合模式下给出了"不是原始采样点"的说明')
 

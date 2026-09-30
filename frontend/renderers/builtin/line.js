@@ -428,6 +428,7 @@ export function createRenderer({ container, options = {} }) {
 
     if (state.aggregated) {
       // 每列一条竖线段：极小与极大都画出来，尖峰因此必然可见
+      ctx.beginPath()
       for (let i = 0; i < series.x.length; i += 1) {
         const x = series.x[i]
         if (!inView(x, view)) continue
@@ -438,6 +439,27 @@ export function createRenderer({ container, options = {} }) {
         ctx.moveTo(px, toPixelY(low, rect, range))
         ctx.lineTo(px, toPixelY(high, rect, range))
       }
+      ctx.stroke()
+
+      // 再把各列中点连成折线。只有竖线时，每列点少的情况下波形看着像一片毛刺；
+      // 中点线把趋势接起来，极值仍然由竖线表达——不丢任何东西
+      ctx.beginPath()
+      let linked = false
+      for (let i = 0; i < series.x.length; i += 1) {
+        const x = series.x[i]
+        const low = series.ymin[i]
+        const high = series.ymax[i]
+        if (!inView(x, view) || low === null || high === null) {
+          linked = false
+          continue
+        }
+        const px = toPixelX(x, rect, view)
+        const py = toPixelY((low + high) / 2, rect, range)
+        if (linked) ctx.lineTo(px, py)
+        else ctx.moveTo(px, py)
+        linked = true
+      }
+      ctx.stroke()
     } else {
       // 折线：缺失值断线，不跨过去连
       let drawing = false
