@@ -1,0 +1,60 @@
+/* 视觉相关的值集中在这里（U4：改风格只改一处） */
+:root {
+  --bg: #f5f7f9;
+  --panel: #ffffff;
+  --border: #dde3e8;
+  --text: #263238;
+  --muted: #78909c;
+  --accent: #1e88e5;
+  --warn: #ef6c00;
+  --danger: #c62828;
+  --ok: #2e7d32;
+  --gap: 10px;
+  --radius: 6px;
+  --font: 13px/1.5 system-ui, "Segoe UI", "Microsoft YaHei", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font: var(--font);
+  color: var(--text);
+  background: var(--bg);
+}
+
+button {
+  font: inherit;
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+input[type="text"] {
+  font: inherit;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  color: var(--text);
+}
+
+input[type="text"]:focus {
+  outline: none;
+  border-color: var(--accent);
+}

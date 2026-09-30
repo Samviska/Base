@@ -8,11 +8,16 @@
 
 ## 2. 代码位置
 
-| 内容 | 路径（规划） |
+| 内容 | 路径 |
 | --- | --- |
-| 界面组件与布局 | `frontend/ui/` |
-| 文案表 | `frontend/ui/` |
-| 样式与 CSS 变量 | `frontend/ui/` |
+| 界面组件与布局 | `frontend/ui/App.vue`、`frontend/ui/components/`（FilePanel / ChartView / StatusBar） |
+| 文案表 | `frontend/ui/strings.js` |
+| 样式与 CSS 变量 | `frontend/ui/styles.css` |
+| 入口 | `frontend/ui/main.js`、`frontend/index.html` |
+| Vite 配置（root 即 `frontend/`） | `frontend/vite.config.js` |
+
+> 目录按业务用途分（`ui/` `api/` `renderers/`），不套一层 `src/`。
+> 起法见 [frontend/README.md](../../frontend/README.md)。
 
 ## 3. 对外接口
 
@@ -50,6 +55,8 @@
 | 参数控件写死 | 新增插件参数要改界面代码 | 按插件的参数声明**动态生成**控件 |
 | 界面自己判断聚合状态 | 与后端不一致 | 后端在响应里带标志，界面只负责显示 |
 | 界面缓存全量数据 | 内存暴涨，且绕过了分层 | 只缓存"有权获得"的数据（聚合结果） |
+| dev server 只绑 `localhost` | Windows 上常绑到 `::1`，用 `127.0.0.1` 打不开 | `vite.config.js` 里显式 `host: '127.0.0.1'` |
+| 面板之间互相传业务状态 | 加一个面板就要改另一个 | 状态放 App 一层，面板只收 props、只发事件 |
 
 ## 8. 相关
 

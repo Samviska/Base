@@ -61,12 +61,19 @@ python scripts/setup.py
 .venv\Scripts\python.exe -m backend.server
 .venv\Scripts\python.exe -m backend.server --port 8791
 
+# 前端：dev server（另开一个终端）→ http://127.0.0.1:5173/
+cd frontend
+npm install     # 首次
+npm run dev
+
 # 检查与用例
 .venv\Scripts\python.exe scripts\check_docs.py
 .venv\Scripts\python.exe -m unittest discover -s backend/tests -t . -v
+cd frontend; npm test
 ```
 
-开发期**直接跑源码，不打包**；前端将来由 Vite dev server 提供，改完即见。
+开发期**直接跑源码，不打包**：前端改完即见，后端直接跑 Python。
+后端换端口时，页面用 `?backend=ws://127.0.0.1:8791` 指定。
 
 ---
 

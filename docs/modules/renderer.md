@@ -9,29 +9,39 @@
 
 ## 2. 代码位置
 
-| 内容 | 路径（规划） |
+| 内容 | 路径 |
 | --- | --- |
-| 接口定义 | `frontend/renderers/interface.js` |
-| 内置折线图 | `frontend/renderers/builtin/line.js` |
-| 内置柱状图 | `frontend/renderers/builtin/bar.js` |
+| 接口约定 | `frontend/renderers/interface.js` |
+| 内置折线图（Canvas 2D，无框架） | `frontend/renderers/builtin/line.js` |
+| 内置柱状图 | 待做（第 6 批） |
 | 使用者 / 第三方插件 | `plugins/renderers/` |
+| 用例 | `frontend/tests/renderer-interface.test.js` |
 
 ## 3. 对外接口
 
-```
-createRenderer({ container, options }) -> renderer 实例
+```js
+const renderer = createRenderer({ container, options: { axes } })
 
-renderer 实例：
-  mount()                 挂载到 container
-  unmount()               卸载并释放资源
-  setData(series)         设置数据（整体替换）
-  appendData(chunk)       追加数据（静态加载时也走这里）
-  setViewport(range)      设置可见范围
-  setAnnotations(list)    设置标记
-  on(event, handler)      订阅交互事件
+renderer.mount() / unmount()
+renderer.setData(payload)        // 整体替换：payload 就是 M6 query_range 的响应
+renderer.appendData(chunk)       // 追加同名序列的数据（实时推送将来走这里）
+renderer.setViewport({ x0, x1 }) // 数据坐标
+renderer.setAnnotations(list)
+renderer.on(event, handler)      // 返回取消订阅函数
 ```
 
-事件类型：`zoom`、`pan`、`mark-add`、`mark-remove`、`hover`。
+| 事件 | payload | 含义 |
+| --- | --- | --- |
+| `zoom` | `{ x0, x1 }` | 用户滚轮缩放后的视口（已按鼠标位置为锚点换算） |
+| `pan` | `{ x0, x1 }` | 拖拽平移后的视口 |
+| `hover` | `{ x, pixel }` | 鼠标位置的数据坐标；**无人订阅时不算** |
+| `mark-add` / `mark-remove` | — | 第 6 批（标注） |
+
+`options.axes`：序列名 → 轴描述（[contract.md](../contract.md) §4.2），
+渲染器据此判断轴类型是否认识，**不认识就降级绘制并在画布上标注**——不崩、不静默。
+
+数据入口是**绘制数据**：聚合时 `x[i]` 是像素列中心，某列没有数据点时 `ymin[i]`、`ymax[i]` 为
+`null`（不是 0），渲染器**跳过该列**。
 
 接口只认两样东西：**契约数据** + **一个挂载容器**。
 
@@ -76,6 +86,9 @@ renderer 实例：
 | 请求风暴 | 连续缩放时每秒发出几十次数据请求，交互反而更卡 | 按帧节流 + 代次作废，见 [protocol.md](../protocol.md) §4 |
 | 每帧重建全部绘图对象 | 高频重绘时 CPU 占用高 | 复用对象、只更新属性 |
 | 坐标换算写在多处 | 缩放与 tooltip 的坐标对不上 | 坐标变换只在渲染器内部做一次，对外只暴露数据坐标 |
+| 高分屏线条发虚 | Canvas 按 CSS 像素绘制，实际被拉伸 | 按 `devicePixelRatio` 放大画布并 `setTransform` 缩放 |
+| 空列的 `null` 当成 0 画 | 图上出现一段不存在的平线 | 明确跳过 `ymin`/`ymax` 为 `null` 的列 |
+| 缩放到跨度为 0 | 坐标换算除零，画面崩掉 | 视口最小跨度保护（`MIN_SPAN`） |
 
 ## 8. 相关
 

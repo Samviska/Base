@@ -62,8 +62,9 @@
 
 可选优化：后端收到新请求时中止上一个正在计算的聚合。
 
-> **必须配可运行的示例代码**（放 [guides/ai-coding-rules.md](guides/ai-coding-rules.md)）。
-> 否则极容易被实现成"每个 mousemove 发一次请求"——那是本项目最典型的性能塌方点。
+> **已有可运行实现**：`frontend/api/viewport-loader.js`（节流 + 代次作废），
+> 用例在 `frontend/tests/viewport-loader.test.js`。
+> 不要在事件回调里直接发请求——那是本项目最典型的性能塌方点。
 
 ---
 

@@ -1,0 +1,47 @@
+<script setup>
+import { onBeforeUnmount, onMounted, ref } from 'vue'
+
+import { createRenderer } from '../../renderers/builtin/line.js'
+
+const props = defineProps({
+  axes: { type: Object, default: () => ({}) },
+})
+const emit = defineEmits(['zoom', 'pan'])
+
+const host = ref(null)
+let renderer = null
+
+onMounted(() => {
+  // UI 只把容器交出去：渲染器内部不引用 Vue，两者之间只有数据与事件（renderer.md 硬规则 1）
+  renderer = createRenderer({ container: host.value, options: { axes: props.axes } })
+  renderer.mount()
+  renderer.on('zoom', (view) => emit('zoom', view))
+  renderer.on('pan', (view) => emit('pan', view))
+})
+
+onBeforeUnmount(() => {
+  renderer?.unmount()
+  renderer = null
+})
+
+// 对外只暴露"喂数据、设视口、量宽度"，渲染细节不出这个组件
+defineExpose({
+  applyData: (payload) => renderer?.setData(payload),
+  appendData: (payload) => renderer?.appendData(payload),
+  setViewport: (view) => renderer?.setViewport(view),
+  setAnnotations: (list) => renderer?.setAnnotations(list),
+  plotWidth: () => host.value?.clientWidth || 0,
+})
+</script>
+
+<template>
+  <div ref="host" class="chart"></div>
+</template>
+
+<style scoped>
+.chart {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+</style>

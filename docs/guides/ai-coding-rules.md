@@ -22,14 +22,15 @@
 
 ---
 
-## 2. 必须配可运行示例代码的两处
+## 2. 两处最容易写错的地方（示例代码已就位）
 
-**待补**：
+| 位置 | 实现 | 用例 |
+| --- | --- | --- |
+| **节流 + 代次作废**（前端数据请求） | `frontend/api/viewport-loader.js` | `frontend/tests/viewport-loader.test.js` |
+| **像素列 min/max 聚合**（后端） | `backend/aggregate/pixel_columns.py` | `backend/tests/test_aggregate.py` |
 
-1. **节流 + 代次作废**（前端数据请求）
-2. **像素列 min/max 聚合**（后端）
-
-> 这两处是最容易写错的地方，光有文字规则不够，必须给能直接用的示例。
+> 这两处光有文字规则不够。前者写错就变成"每个 `mousemove` 发一次请求"，
+> 交互越缩放越卡；后者写错会抹掉尖峰——而尖峰正是要找的问题。
 
 ---
 

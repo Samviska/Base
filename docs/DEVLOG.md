@@ -49,6 +49,44 @@
 
 ## 记录
 
+### 2026-09-30 | 前端 | 最小闭环：Vue 3 + Vite、按帧节流、Canvas 折线图（第 5 批）
+
+**改动**：
+
+- 新增前端工程：`frontend/package.json`、`vite.config.js`、`index.html`。
+  Vite 的 root 就是 `frontend/`，目录按业务用途分（`ui/` `api/` `renderers/`），不套 `src/`
+- `frontend/api/client.js`：建连、按 `id` 配对响应、事件分发；断线时**让在途请求全部失败**，
+  界面不会停在加载中；重连是手动的（自动重连策略仍未定，C4）
+- `frontend/api/viewport-loader.js`：**按帧节流 + 代次作废**（protocol.md §4 的硬规则落点）
+- `frontend/renderers/`：接口约定 + 内置折线图（Canvas 2D）。聚合时画像素列竖线段，
+  未聚合时画折线并让缺失值断线；缩放/平移交互；轴类型不认识或对数轴未实现时**降级并在画布上标注**
+- `frontend/ui/`：`App.vue` + FilePanel / ChartView / StatusBar 三个组件、文案表、CSS 变量
+- 用例 `frontend/tests/`：10 条常规（Node 内置 test runner，含节流与代次作废）
+  + 2 条真后端联通用例（默认跳过，设 `BACKEND_URL` 后才跑）
+- 文档：`api-client.md`、`renderer.md`、`ui-shell.md`、`frontend/README.md`、
+  `guides/ai-coding-rules.md`（两处"必须给示例代码"已就位）、`protocol.md` §4、根 `README.md`
+
+**原因**：kickoff §五 第 5 批——看到图。此前所有能力只存在于后端与测试里。
+
+**影响面**：契约**未变**（`schema_version` 仍 `1.0`），后端代码**零改动**
+（U2 的验收方法：新增界面不应碰核心——本批确实一行没碰）。
+新增前端依赖 `vue@3.5.43`、`vite@8.3.1`、`@vitejs/plugin-vue@6.0.9`，版本写死、不用 `^`/`~`。
+渲染器事件 payload 定为 `{x0, x1}`（zoom / pan），目标分辨率由 UI 按画布宽度提供——已写进 renderer.md。
+标注（`mark-add` / `mark-remove`）与柱状图仍待第 6 批。
+
+**验证**：
+
+- `npm test` → 12 条通过；其中两条连真后端，字段级核对 `hello` / `open_file` / `query_range`
+  与错误码（`FILE_NOT_FOUND`、`CONTRACT_VIOLATION` 且带 `detail.path`）
+- `npm run build` → 24 个模块编译通过（190 ms）
+- dev server `http://127.0.0.1:5173/` 返回 200，`/ui/App.vue` 编译通过（36 KB）
+- **待人工确认**：浏览器里打开该地址、选 `contract/examples/example-basic.json`，
+  确认波形、缩放平移与"当前为聚合显示"标注（渲染结果无法在无浏览器环境自动断言）
+
+**相关**：[guides/kickoff.md](guides/kickoff.md) §五 第 5 批、[modules/api-client.md](modules/api-client.md)、
+[modules/renderer.md](modules/renderer.md)、[modules/ui-shell.md](modules/ui-shell.md)、
+[protocol.md](protocol.md) §4
+
 ### 2026-09-30 | 核心与通信 | WebSocket 服务与命令分发落地（第 4 批）
 
 **改动**：
