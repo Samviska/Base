@@ -1,0 +1,9 @@
+{
+  "id": "jp18-ecg",
+  "type": "source",
+  "mode": "oneshot",
+  "version": "1.0.0",
+  "display_name": "JP18 心电日志（十六进制文本）",
+  "entry": "plugin.py",
+  "notes": "每 203 字节一个子包：0x88 包头 + 66 组 3 字节 + 末尾 4 字节；样本不足时用 80 80 80 组补齐"
+}

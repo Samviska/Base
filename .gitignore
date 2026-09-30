@@ -27,6 +27,9 @@ logs/
 _local/
 cache/
 
+# ---- 中间产物（临时脚本与输出，见 AGENTS.md 的目录规范）----
+_intermediate/
+
 # ---- 个人本地指令覆盖（不入库）----
 AGENTS.local.md
 CLAUDE.local.md

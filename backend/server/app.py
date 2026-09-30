@@ -17,6 +17,7 @@ from pathlib import Path
 from websockets.asyncio.server import serve
 
 from backend.core import Session, handle
+from backend.sources import load_directory
 
 # 协议版本随 M1 hello 下发，前端据此校对；改消息形状时一起改
 PROTOCOL_VERSION = "1.0"
@@ -59,6 +60,8 @@ async def handler(websocket) -> None:
 
 
 async def serve_forever(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> None:
+    # 插件目录在这里扫描一次：空目录是合法状态，坏插件只记警告，不影响服务起来
+    load_directory()
     try:
         async with serve(handler, host, port):
             log.info("WebSocket 服务已就绪：ws://%s:%d（Ctrl+C 停止）", host, port)

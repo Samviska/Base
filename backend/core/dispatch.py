@@ -12,17 +12,27 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from backend.filters import get_plugin, list_plugins
+from backend.contract import validate
+from backend.filters import get_plugin as get_filter_plugin
+from backend.filters import list_plugins as list_filter_plugins
+from backend.sources import get_plugin as get_source_plugin
+from backend.sources import list_plugins as list_source_plugins
+from backend.sources import load_warnings as source_warnings
 
 from .errors import (
+    CONTRACT_VIOLATION,
+    FILE_NOT_FOUND,
     INTERNAL,
     INVALID_REQUEST,
+    PLUGIN_FAILED,
     PLUGIN_NOT_FOUND,
     UNKNOWN_TYPE,
     CoreError,
 )
 from .session import Session
-from .source import load
+
+# 不指定数据源插件时用它：直接读契约 JSON（调试、手工造数据、别人给的契约文件）
+DEFAULT_SOURCE_PLUGIN = "contract-json"
 
 # 已登记但尚未实现的消息：标注与会话持久化属第 6 批。
 # 用 INTERNAL + 明确文案，而不是谎报 UNKNOWN_TYPE——它们确实登记在 messages.md 里
@@ -70,18 +80,35 @@ def handle(session: Session, message: Any) -> dict | None:
 
 
 def _list_plugins(session: Session, payload: dict) -> dict:
-    # 数据源与渲染两类插件分属第 2 批与第 5 批：现在如实为空数组，而不是省略字段或伪造一条
     return {
         "plugins": [
-            {
-                "id": plugin.id,
-                "type": "filter",
-                "version": plugin.version,
-                "display_name": plugin.display_name,
-                "params": plugin.declare_params(),
-            }
-            for plugin in list_plugins()
-        ]
+            *(_source_info(plugin) for plugin in list_source_plugins()),
+            *(_filter_info(plugin) for plugin in list_filter_plugins()),
+        ],
+        # 坏插件不该让应用起不来，但使用者必须知道它坏了（S4）
+        "warnings": source_warnings(),
+    }
+
+
+def _source_info(plugin) -> dict:
+    return {
+        "id": plugin.id,
+        "type": "source",
+        "mode": plugin.mode,
+        "version": plugin.version,
+        "display_name": plugin.display_name,
+        "params": plugin.declare_params(),
+        "notes": plugin.notes,
+    }
+
+
+def _filter_info(plugin) -> dict:
+    return {
+        "id": plugin.id,
+        "type": "filter",
+        "version": plugin.version,
+        "display_name": plugin.display_name,
+        "params": plugin.declare_params(),
     }
 
 
@@ -90,14 +117,36 @@ def _open_file(session: Session, payload: dict) -> dict:
     if not isinstance(path, str) or not path:
         raise CoreError(INVALID_REQUEST, "open_file 需要字符串 path")
 
-    plugin = payload.get("source_plugin")
-    if plugin:
+    options = payload.get("options")
+    if options is None:
+        options = {}
+    if not isinstance(options, dict):
+        raise CoreError(INVALID_REQUEST, "options 必须是对象")
+
+    plugin_id = payload.get("source_plugin") or DEFAULT_SOURCE_PLUGIN
+    try:
+        plugin = get_source_plugin(str(plugin_id))
+    except ValueError as exc:
+        raise CoreError(PLUGIN_NOT_FOUND, str(exc)) from exc
+
+    try:
+        data = plugin.extract(path, options)
+    except FileNotFoundError as exc:
+        raise CoreError(FILE_NOT_FOUND, str(exc)) from exc
+    except Exception as exc:
+        # 插件异常隔离：转成可读错误回给界面，不向主流程传播
+        raise CoreError(PLUGIN_FAILED, f"{plugin.display_name} 解析失败：{exc}") from exc
+
+    # 兜底校验：插件应当自校验，但不认识的插件也可能被放进目录
+    result = validate(data)
+    if not result.ok:
         raise CoreError(
-            PLUGIN_NOT_FOUND,
-            f"数据源插件机制尚未落地（第 2 批）：当前只能直接打开契约 JSON，收到 {plugin!r}",
+            CONTRACT_VIOLATION,
+            f"{plugin.display_name} 的输出不符合契约：{result.violations[0].describe()}",
+            result.error_detail(),
         )
 
-    session.open(load(path), {"path": path, "plugin": None})
+    session.open(data, {"path": path, "plugin": plugin.id, "options": options})
     return session.summary()
 
 
@@ -145,7 +194,7 @@ def _validate_chain(chain: Any) -> list[dict]:
         if params is not None and not isinstance(params, dict):
             raise CoreError(INVALID_REQUEST, "chain 的 params 必须是对象")
         try:
-            get_plugin(step["plugin"])
+            get_filter_plugin(step["plugin"])
         except ValueError as exc:
             # 插件不存在属于"请求指定的东西不存在"，比笼统的 INVALID_REQUEST 更准
             raise CoreError(PLUGIN_NOT_FOUND, str(exc)) from exc

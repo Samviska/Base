@@ -49,6 +49,56 @@
 
 ## 记录
 
+### 2026-09-30 | 数据源 | 插件机制落地 + JP18 心电日志解析（第 2 批·上）
+
+**改动**：
+
+- 新增 `backend/sources/`：注册表（`registry.py`）+ 内置插件 `contract_json.py`
+  （原 `backend/core/source.py` 的过渡实现转正）。**目录即插件**：`plugins/sources/<名字>/`
+  放 `manifest.json` + 入口模块，服务启动时扫描注册；坏插件只记警告，不影响启动
+- 新增 `plugins/sources/jp18/`：**真实设备日志**（十六进制文本）的解析插件，含格式说明 README
+- `backend/core/dispatch.py`：`open_file` 改调插件注册表；异常按 `FILE_NOT_FOUND` /
+  `PLUGIN_FAILED` / `CONTRACT_VIOLATION` 映射；插件输出**兜底再校验一次**；
+  `list_plugins` 增加数据源插件与 `warnings`（坏插件提示，S4）
+- 用例 `backend/tests/test_sources.py`（17 个：注册表、坏插件隔离、JP18 解析、可复现性）
+- 删除 `backend/core/source.py`；`.gitignore` 忽略 `_intermediate/`（临时脚本与输出不入库）
+- 文档：`source.md`、`core.md`、`messages.md` M2、`guides/add-source-plugin.md`（待建 → 可执行）
+
+**JP18 格式结论**（用真实日志反推，单独记下来免得下次再猜）：
+
+| 段 | 长度 | 说明 |
+| --- | --- | --- |
+| 包头 | 1 字节 | 固定 `0x88` |
+| 样本 | 66 组 × 3 字节 | 大端**有符号 24 位**（即"3 字节合成有符号 32 位整型"） |
+| 填充 | 视情况 | 样本不足 66 组时用 `80 80 80` 组补齐 |
+| 末尾 | 4 字节 | 不解析 |
+
+子包固定 **203 字节**（与 1624 = 8 × 203 的读取缓冲对上）。判定依据：320 个子包**包头零失配**，
+且 320×66 − 1120 组填充 = **正好 20000 个样本**——不是整数就说明切分错位。
+**踩过的坑**：不能靠"搜索 0x88"找包边界，数据里平均每 200 字节就有一个 0x88，必须按固定包长切分再校验首字节。
+
+**原因**：kickoff §五 第 2 批。用户提供真实日志与格式说明后，"第 2 批是插件形态、
+可以后做"的判断得到验证：插件机制落地后，接入一类新日志只新增 `plugins/sources/<名字>/`。
+
+**影响面**：契约**结构未变**（`schema_version` 仍 `1.0`），无需迁移。
+`messages.md` M2 的响应新增**可选字段** `warnings`：不认识的客户端忽略即可，不需迁移。
+`backend/core/source.py` 被删除，职责由内置插件 `contract-json` 承担——**行为不变**
+（不指定 `source_plugin` 时仍是"直接读契约 JSON"）。
+存储实现（第 2 批·下）与前端"选插件 + 填参数"界面尚未做，真实日志目前要走命令行或改前端才用得上。
+
+**验证**：
+
+- `.venv\Scripts\python.exe -m unittest discover -s backend/tests -t . -v` → 109 个用例通过
+- 端到端（真服务 + 真客户端 + 用户提供的日志文件）：
+  `list_plugins` → `contract-json` / `jp18-ecg` / `moving-average`，`warnings` 为空；
+  `open_file` 指定 `jp18-ecg`、`sample_rate: 250` → 20000 点、轴 `time`/`ms`/`origin=start`、
+  `x_range [0, 79996]`、`notes` 记录"跳过 1120 组 80 80 80 填充"，耗时 360 ms；
+  随后 `query_range` 全览 → 1920 个像素列、10 ms
+- 坏插件三种情形（入口抛异常、缺 manifest、入口文件不存在）都只产生警告，服务照常启动
+
+**相关**：[guides/kickoff.md](guides/kickoff.md) §五 第 2 批、[modules/source.md](modules/source.md)、
+[guides/add-source-plugin.md](guides/add-source-plugin.md)、`plugins/sources/jp18/README.md`
+
 ### 2026-09-30 | 前端 | 最小闭环：Vue 3 + Vite、按帧节流、Canvas 折线图（第 5 批）
 
 **改动**：

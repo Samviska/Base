@@ -125,9 +125,14 @@ class OpenFileTest(unittest.TestCase):
         self.assertEqual("CONTRACT_VIOLATION", response["error"]["code"])
         self.assertEqual("series[0]", response["error"]["detail"]["path"])
 
-    def test_source_plugin_is_reported_as_missing(self):
+    def test_unknown_source_plugin_is_reported(self):
         response = send(Session(), "open_file", {"path": BASIC, "source_plugin": "demo-log"})
         self.assertEqual("PLUGIN_NOT_FOUND", response["error"]["code"])
+        self.assertIn("contract-json", response["error"]["message"])
+
+    def test_options_must_be_an_object(self):
+        response = send(Session(), "open_file", {"path": BASIC, "options": []})
+        self.assertEqual("INVALID_REQUEST", response["error"]["code"])
 
 
 class QueryRangeTest(unittest.TestCase):
@@ -174,15 +179,18 @@ class QueryRangeTest(unittest.TestCase):
 
 
 class PluginAndChainTest(unittest.TestCase):
-    def test_list_plugins_reports_filter_plugins(self):
+    def test_list_plugins_reports_both_kinds(self):
         payload = send(Session(), "list_plugins")["payload"]
-        ids = [p["id"] for p in payload["plugins"]]
-        self.assertIn("moving-average", ids)
+        by_id = {item["id"]: item for item in payload["plugins"]}
 
-        plugin = next(p for p in payload["plugins"] if p["id"] == "moving-average")
-        self.assertEqual("filter", plugin["type"])
-        self.assertEqual("滑动平均", plugin["display_name"])
-        self.assertEqual("window", plugin["params"][0]["name"])
+        self.assertEqual("filter", by_id["moving-average"]["type"])
+        self.assertEqual("滑动平均", by_id["moving-average"]["display_name"])
+        self.assertEqual("window", by_id["moving-average"]["params"][0]["name"])
+
+        self.assertEqual("source", by_id["contract-json"]["type"])
+        self.assertEqual("oneshot", by_id["contract-json"]["mode"])
+        # 坏插件要能在界面上说出来（S4）
+        self.assertIn("warnings", payload)
 
     def test_set_then_get_filter_chain(self):
         session = opened()

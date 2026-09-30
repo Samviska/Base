@@ -13,7 +13,6 @@
 | 会话状态与三层缓存 | `backend/core/session.py` |
 | 命令分发（消息 → 响应） | `backend/core/dispatch.py` |
 | 错误码与领域错误 | `backend/core/errors.py` |
-| **过渡**数据源入口（直接读契约 JSON） | `backend/core/source.py` |
 | 用例 | `backend/tests/test_core.py` |
 
 ## 3. 对外接口
@@ -53,11 +52,13 @@ response = handle(session, request_envelope)   # 同步函数：返回响应信�
 聚合缓存**有上限**（32 条，超出淘汰最久未用的）：拖拽缩放会持续产生新键，不设上限就是内存泄漏。
 换文件时**保留滤波链配置**——换一个文件通常还想用同一套滤波。
 
-### 3.2 过渡：数据源入口
+### 3.2 数据源插件的调用
 
-`open_file` 目前直接读**契约 JSON 文件**（`source.py`），因为数据源插件机制（第 2 批）尚未落地；
-请求带 `source_plugin` 时回 `PLUGIN_NOT_FOUND`。
-插件机制就绪后删掉 `source.py`、改为调插件注册表，**命令层的请求与响应形状不变**。
+`open_file` 通过 `backend/sources` 的注册表调用插件：不指定 `source_plugin` 时用内置的
+`contract-json`（直接读契约 JSON），指定时按 id 查表。
+插件异常在这里被翻译成错误码（`FILE_NOT_FOUND` / `PLUGIN_FAILED`），**不向主流程传播**；
+插件输出还会被核心**兜底校验一次**——插件应当自校验，但目录里的插件不一定守规矩。
+加载失败的插件只记警告，警告随 `list_plugins` 回给界面（S4）。
 
 ## 4. 依赖规则
 

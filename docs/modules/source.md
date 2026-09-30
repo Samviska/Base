@@ -8,11 +8,13 @@
 
 ## 2. 代码位置
 
-| 内容 | 路径（规划） |
+| 内容 | 路径 |
 | --- | --- |
-| 接口定义与注册机制 | `backend/sources/` |
-| 内置实现 | `backend/sources/` |
-| 使用者 / 第三方插件 | `plugins/sources/` |
+| 接口定义与注册机制 | `backend/sources/registry.py`、`backend/sources/__init__.py` |
+| 内置实现（直接读契约 JSON） | `backend/sources/contract_json.py` |
+| 使用者 / 第三方插件 | `plugins/sources/<名字>/`（`manifest.json` + 入口模块） |
+| 实例：JP18 心电日志 | `plugins/sources/jp18/`（含格式说明 README） |
+| 用例 | `backend/tests/test_sources.py` |
 
 ## 3. 对外接口
 
@@ -20,10 +22,29 @@
 
 | 模式 | 接口形态 | 本期 |
 | --- | --- | --- |
-| **一次性** | `extract(path, options) -> 契约数据` | 实现 |
-| **持续** | `open_stream(config) -> 句柄 { 取数据块(), 关闭() }` | **只留接口** |
+| **一次性** | `extract(path, options) -> 契约数据` | **已实现** |
+| **持续** | `open_stream(config) -> 句柄 { 取数据块(), 关闭() }` | **只留接口**（`manifest.mode = "stream"`） |
 
 > 将来的实时数据更新就是"写一个持续模式的插件"，核心不需要改动。
+
+插件对外只有这些成员：
+
+| 成员 | 作用 |
+| --- | --- |
+| `manifest.json` | 声明 `id` / `display_name` / `version` / `entry` / `mode`；**参数在代码里声明**，避免两处重复 |
+| `extract(path, options) -> dict` | 把输入变成契约数据；**必须自校验** |
+| `declare_params() -> list[dict]` | 参数声明，界面据此自动生成控件 |
+
+核心侧（`backend/core/dispatch.py`）负责：
+
+| 情形 | 行为 |
+| --- | --- |
+| `source_plugin` 省略 | 用内置的 `contract-json`（直接读契约 JSON） |
+| 插件不存在 | `PLUGIN_NOT_FOUND`，消息里列出可用插件 |
+| 插件抛 `FileNotFoundError` | `FILE_NOT_FOUND` |
+| 插件抛其它异常 | `PLUGIN_FAILED` + 可读原因；**不向主流程传播** |
+| 插件输出不合规 | 核心**兜底再校验一次** → `CONTRACT_VIOLATION` 并给出字段路径 |
+| 插件目录里的坏插件 | 加载失败只记警告，服务照常启动；警告随 `list_plugins` 回给界面（S4） |
 
 ## 4. 依赖规则
 
@@ -58,6 +79,10 @@
 | 单位缺失 | 界面无法显示单位 | 无量纲写 `"1"` |
 | 提取过程中丢弃异常点 | 尖峰消失，问题被藏起来 | 保留原始值；用 `null` 表示缺失，不要跳过 |
 | 解析失败直接抛出原始异常 | 使用者看不懂 | 转成"第几个文件、第几行、什么格式期望"的可读错误 |
+| 十六进制文本日志 | 当二进制读会得到一堆 ASCII 码 | 先按十六进制 token 解析成字节，再按包结构切分（见 JP18 插件） |
+| 数据里出现"像包头"的字节 | 全流搜索 `0x88` 会在数据中间误判包边界 | 用**固定包长**切分并校验首字节；不要靠搜索包头 |
+| 数据中间混入填充 | 样本数不是整数、波形出现满量程跳变 | 显式跳过 `80 80 80` 组；**样本数正好是整数**才说明切分对了 |
+| 日志没有采样率 | 硬凑毫秒会让波形含义失真 | 横轴默认采样序号，采样率做成插件参数 |
 
 ## 8. 相关
 
