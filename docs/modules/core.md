@@ -60,6 +60,9 @@ response = handle(session, request_envelope)   # 同步函数：返回响应信�
 传文件时退到所在目录、目录排在文件前、坏条目（权限/失效链接）跳过而不是整次失败。
 条目上限 2000 条，超出时响应里带 `truncated`。
 
+响应还带 `roots`（各盘符）与 `shortcuts`（主目录/桌面/文档/下载）：**选择面是整块硬盘**，
+不限于项目目录。
+
 ### 3.4 数据源插件的调用
 
 `open_file` 通过 `backend/sources` 的注册表调用插件：不指定 `source_plugin` 时用内置的

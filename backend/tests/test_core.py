@@ -209,6 +209,16 @@ class BrowseTest(unittest.TestCase):
     def test_bad_path_type_is_invalid_request(self):
         self.assertEqual("INVALID_REQUEST", send(Session(), "browse", {"path": 123})["error"]["code"])
 
+    def test_response_lists_roots_and_shortcuts(self):
+        """整块硬盘都要能去：界面的盘符与常用目录按钮靠这两个字段。"""
+        payload = send(Session(), "browse")["payload"]
+        self.assertTrue(payload["roots"])
+        self.assertTrue(any(item["name"] == "主目录" for item in payload["shortcuts"]))
+
+    def test_unresolvable_relative_path_falls_back_to_home(self):
+        payload = send(Session(), "browse", {"path": "不存在的目录/子目录/x.json"})["payload"]
+        self.assertTrue(Path(payload["path"]).is_dir())
+
 
 class PluginAndChainTest(unittest.TestCase):
     def test_list_plugins_reports_both_kinds(self):

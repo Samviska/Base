@@ -4,9 +4,13 @@
 
 浏览器拿不到本机文件系统路径，所以浏览目录必须由后端提供（本地应用场景）。
 **只列名字与大小，不读内容**——读内容是数据源插件的活。
+
+响应里带 `roots` 与 `shortcuts`：整块硬盘都要能去，不能只在项目目录里打转。
 """
 from __future__ import annotations
 
+import os
+import string
 from pathlib import Path
 
 from .errors import INVALID_REQUEST, CoreError
@@ -14,12 +18,11 @@ from .errors import INVALID_REQUEST, CoreError
 # 一个目录最多列这么多条：几万个文件的目录会把界面和消息都拖住
 MAX_ENTRIES = 2000
 
+_SHORTCUT_NAMES = {"Desktop": "桌面", "Documents": "文档", "Downloads": "下载"}
+
 
 def list_directory(path: str | None) -> dict:
-    target = Path(path).expanduser() if path else Path.home()
-    if not target.is_dir():
-        # 传进来的是文件（或不存在）时退到它所在的目录，别让一次误点断掉浏览
-        target = target.parent if target.parent.is_dir() else Path.home()
+    target = _resolve(path)
 
     try:
         children = sorted(target.iterdir(), key=lambda item: (not item.is_dir(), item.name.lower()))
@@ -48,4 +51,38 @@ def list_directory(path: str | None) -> dict:
         "parent": str(parent) if parent != target else None,
         "entries": entries,
         "truncated": len(children) > MAX_ENTRIES,
+        "roots": _roots(),
+        "shortcuts": _shortcuts(),
     }
+
+
+def _resolve(path: str | None) -> Path:
+    """把入参变成一个真实存在的目录。
+
+    相对路径按调用方的工作目录解析——界面给不出绝对路径时才走这条路；
+    传文件（或不存在）时退到它所在目录，别让一次误点断掉浏览。
+    """
+    if not path:
+        return Path.home()
+    candidate = Path(path).expanduser()
+    if candidate.is_dir():
+        return candidate
+    if candidate.parent.is_dir():
+        return candidate.parent
+    return Path.home()
+
+
+def _roots() -> list[str]:
+    if os.name != "nt":
+        return ["/"]
+    return [f"{letter}:\\" for letter in string.ascii_uppercase if Path(f"{letter}:/").is_dir()]
+
+
+def _shortcuts() -> list[dict]:
+    home = Path.home()
+    items = [{"name": "主目录", "path": str(home)}]
+    for folder, label in _SHORTCUT_NAMES.items():
+        candidate = home / folder
+        if candidate.is_dir():
+            items.append({"name": label, "path": str(candidate)})
+    return items

@@ -11,8 +11,13 @@ const props = defineProps({
 })
 const emit = defineEmits(['update:modelValue', 'select'])
 
+const ABSOLUTE = /^(?:[A-Za-z]:[\\/]|[\\/])/
+
 const current = ref('')
+const typed = ref('')
 const parent = ref(null)
+const roots = ref([])
+const shortcuts = ref([])
 const entries = ref([])
 const truncated = ref(false)
 const picked = ref('')
@@ -25,7 +30,10 @@ async function load(path) {
   try {
     const payload = await props.request('browse', path ? { path } : {})
     current.value = payload.path
+    typed.value = payload.path
     parent.value = payload.parent
+    roots.value = payload.roots || []
+    shortcuts.value = payload.shortcuts || []
     entries.value = payload.entries
     truncated.value = payload.truncated
     picked.value = ''
@@ -39,7 +47,10 @@ async function load(path) {
 watch(
   () => props.modelValue,
   (open) => {
-    if (open) load(props.initialPath)
+    if (!open) return
+    // 只有绝对路径才当起点：相对路径（如 contract/examples/x.json）会把浏览困在项目目录里，
+    // 而使用者要的是"整块硬盘都能去"
+    load(ABSOLUTE.test(props.initialPath || '') ? props.initialPath : '')
   },
 )
 
@@ -72,14 +83,34 @@ function sizeText(size) {
     <section class="dialog">
       <header>
         <strong>{{ strings.browser.title }}</strong>
-        <span class="path">{{ current }}</span>
+        <span class="where">{{ current }}</span>
       </header>
 
       <div class="toolbar">
-        <button :disabled="!parent || busy" @click="load(parent)">
-          ↑ {{ strings.browser.parent }}
+        <button :disabled="!parent || busy" @click="load(parent)">↑ {{ strings.browser.parent }}</button>
+        <input
+          v-model="typed"
+          type="text"
+          :disabled="busy"
+          placeholder="粘贴绝对路径后回车"
+          @keyup.enter="load(typed)"
+        />
+        <button :disabled="busy" @click="load(typed)">前往</button>
+      </div>
+
+      <!-- 各盘符与常用目录：整块硬盘都能去 -->
+      <div class="toolbar">
+        <button v-for="root in roots" :key="root" :disabled="busy" @click="load(root)">
+          {{ root }}
         </button>
-        <button :disabled="busy" @click="load('')">{{ strings.browser.home }}</button>
+        <button
+          v-for="item in shortcuts"
+          :key="item.path"
+          :disabled="busy"
+          @click="load(item.path)"
+        >
+          {{ item.name }}
+        </button>
         <span v-if="truncated" class="note">{{ strings.browser.truncated }}</span>
       </div>
 
@@ -122,8 +153,8 @@ function sizeText(size) {
 .dialog {
   display: flex;
   flex-direction: column;
-  width: min(720px, 92vw);
-  height: min(560px, 84vh);
+  width: min(760px, 92vw);
+  height: min(600px, 88vh);
   padding: var(--gap);
   gap: var(--gap);
   border-radius: var(--radius);
@@ -137,7 +168,7 @@ header {
   gap: 4px;
 }
 
-.path {
+.where {
   color: var(--muted);
   font-size: 12px;
   word-break: break-all;
@@ -145,8 +176,14 @@ header {
 
 .toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--gap);
+  gap: 6px;
+}
+
+.toolbar input[type="text"] {
+  flex: 1;
+  min-width: 200px;
 }
 
 .note {

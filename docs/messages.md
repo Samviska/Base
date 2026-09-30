@@ -407,13 +407,15 @@
 | 方向 | 前端 → 后端 |
 | 形态 | 请求 |
 | payload | `{ "path": "..." }`（省略 = 用户主目录） |
-| 响应 payload | `{ "path": "...", "parent": "..." \| null, "entries": [ { "name": "...", "path": "...", "type": "dir" \| "file", "size": 123 \| null } ], "truncated": false }` |
+| 响应 payload | `{ "path": "...", "parent": "..." \| null, "entries": [ { "name": "...", "path": "...", "type": "dir" \| "file", "size": 123 \| null } ], "truncated": false, "roots": ["C:\\"], "shortcuts": [ { "name": "主目录", "path": "..." } ] }` |
 
 **为什么需要它**：浏览器拿不到本机文件系统路径，而 `open_file` 要的正是**路径**，
 所以「浏览文件」只能由后端提供。它只列名字与大小，**不读文件内容**——读内容是数据源插件的职责。
 
 - `parent`：上一级目录；已在根目录时为 `null`
 - 目录排在文件前面；`path` 传的是文件时，退到它所在的目录
+- **`roots`**：可去的根（Windows 是各盘符，类 Unix 是 `/`）；**`shortcuts`**：常用目录
+  （主目录、桌面、文档、下载，存在才给）。选择面是**整块硬盘**，不限于项目目录
 - 一个目录最多列 2000 条，超出时 `truncated` 为 `true`
 - 权限不足或失效链接的条目直接跳过，不让整次浏览失败
 
